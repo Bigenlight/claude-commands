@@ -1,0 +1,11 @@
+{
+  "name": "claude-commands",
+  "version": "1.0.0",
+  "description": "Multi-agent orchestration workflow for Claude Code",
+  "author": {
+    "name": "Bigenlight"
+  },
+  "repository": "https://github.com/Bigenlight/claude-commands",
+  "license": "MIT",
+  "keywords": ["orchestration", "multi-agent", "workflow"]
+}

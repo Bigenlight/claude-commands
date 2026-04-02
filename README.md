@@ -1,28 +1,48 @@
 # claude-commands
 
-Multi-agent orchestration skill for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+Personal Claude Code skills — shared online, installed manually on each machine.
 
-## Install
+## Skills
+
+| Skill | Trigger | Description |
+|-------|---------|-------------|
+| [`/orchestrate`](#orchestrate) | Auto or manual | Multi-agent orchestration pipeline |
+| [`/repo-context`](#repo-context) | Manual | Read CLAUDE.md + README to orient in any repo |
+
+---
+
+## Install (all skills)
 
 ```bash
 git clone git@github.com:Bigenlight/claude-commands.git
+cd claude-commands
+
+# orchestrate
 mkdir -p ~/.claude/skills/orchestrate
-cp claude-commands/skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
+cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
+
+# repo-context
+mkdir -p ~/.claude/skills/repo-context
+cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
 ```
 
-Restart Claude Code — the `orchestrate` skill will be active.
+Restart Claude Code — skills will be active.
 
-## Update
+## Update (all skills)
 
 ```bash
 cd claude-commands
 git pull
+
 cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
+cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
 ```
 
-## Usage
+---
 
-Claude auto-triggers the skill when you describe a complex, multi-agent task. You can also invoke it directly:
+## orchestrate
+
+Multi-agent orchestration for complex tasks. Auto-triggers when describing multi-agent work, or invoke directly:
 
 ```
 /orchestrate fix the login bug
@@ -30,9 +50,7 @@ Claude auto-triggers the skill when you describe a complex, multi-agent task. Yo
 /orchestrate refactor the database layer to use connection pooling
 ```
 
-## What it does
-
-Auto-classifies task complexity (LOW / MEDIUM / HIGH / CRITICAL) and selects an execution mode:
+Auto-classifies complexity (LOW / MEDIUM / HIGH / CRITICAL) and selects an execution mode:
 
 | Mode | When |
 |------|------|
@@ -43,10 +61,25 @@ Auto-classifies task complexity (LOW / MEDIUM / HIGH / CRITICAL) and selects an 
 
 Model selection is automatic: Sonnet for coding, Opus for planning (HIGH+), reviews, and verification.
 
+---
+
+## repo-context
+
+Reads `CLAUDE.md` and `README.md` in the current repo, checks recent git log, and gives a quick orientation summary. Useful at the start of a new conversation.
+
+```
+/repo-context
+```
+
+Outputs: repo purpose / folder structure / recent activity / key conventions / suggested entry point.
+
+---
+
 ## Uninstall
 
 ```bash
 rm -rf ~/.claude/skills/orchestrate
+rm -rf ~/.claude/skills/repo-context
 ```
 
 ## License

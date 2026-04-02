@@ -8,6 +8,7 @@ Personal Claude Code skills — shared online, installed manually on each machin
 |-------|---------|-------------|
 | [`/orchestrate`](#orchestrate) | Auto or manual | Multi-agent orchestration pipeline |
 | [`/repo-context`](#repo-context) | Manual | Read CLAUDE.md + README to orient in any repo |
+| [`/git-pull-push`](#git-pull-push) | Manual | Pull → commit → push in one shot; auto-resolves conflicts with up to 5 Opus agents |
 | [`/md-img-resize`](#md-img-resize) | Manual | Auto-resize markdown image widths based on actual image dimensions |
 
 ---
@@ -26,6 +27,10 @@ cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
 mkdir -p ~/.claude/skills/repo-context
 cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
 
+# git-pull-push
+mkdir -p ~/.claude/skills/git-pull-push
+cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
+
 # md-img-resize
 mkdir -p ~/.claude/skills/md-img-resize
 cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
@@ -41,6 +46,7 @@ git pull
 
 cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
 cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
+cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
 cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
 ```
 
@@ -81,6 +87,22 @@ Outputs: repo purpose / folder structure / recent activity / key conventions / s
 
 ---
 
+## git-pull-push
+
+Pull → commit → push를 한 번에 처리. 충돌 발생 시 Opus 에이전트를 최대 5명 동원해서 자동 resolve.
+
+```
+/git-pull-push
+```
+
+수행 순서: `git status` 확인 → 변경사항 있으면 커밋 → `git pull --rebase` → `git push`
+
+충돌 해결 우선순위:
+1. **두 내용 공존** — 서로 다른 내용이면 둘 다 살림
+2. **로컬 우선** — 공존 불가 시 로컬 커밋 내용 채택
+
+---
+
 ## md-img-resize
 
 Auto-resizes `<img>` tag widths in markdown files based on actual image dimensions. Handles both `![](path)` and `<img src="...">` patterns.
@@ -108,6 +130,7 @@ Requires Pillow: `pip install Pillow`
 ```bash
 rm -rf ~/.claude/skills/orchestrate
 rm -rf ~/.claude/skills/repo-context
+rm -rf ~/.claude/skills/git-pull-push
 rm -rf ~/.claude/skills/md-img-resize
 ```
 

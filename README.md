@@ -8,6 +8,7 @@ Personal Claude Code skills — shared online, installed manually on each machin
 |-------|---------|-------------|
 | [`/orchestrate`](#orchestrate) | Auto or manual | Multi-agent orchestration pipeline |
 | [`/repo-context`](#repo-context) | Manual | Read CLAUDE.md + README to orient in any repo |
+| [`/md-img-resize`](#md-img-resize) | Manual | Auto-resize markdown image widths based on actual image dimensions |
 
 ---
 
@@ -24,6 +25,10 @@ cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
 # repo-context
 mkdir -p ~/.claude/skills/repo-context
 cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
+
+# md-img-resize
+mkdir -p ~/.claude/skills/md-img-resize
+cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
 ```
 
 Restart Claude Code — skills will be active.
@@ -36,6 +41,7 @@ git pull
 
 cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
 cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
+cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
 ```
 
 ---
@@ -75,11 +81,34 @@ Outputs: repo purpose / folder structure / recent activity / key conventions / s
 
 ---
 
+## md-img-resize
+
+Auto-resizes `<img>` tag widths in markdown files based on actual image dimensions. Handles both `![](path)` and `<img src="...">` patterns.
+
+```
+/md-img-resize path/to/file.md
+/md-img-resize                  ← uses file mentioned in conversation
+```
+
+Width formula: `max(380, min(int(ratio × 420), 860))` where `ratio = width / height`
+
+| ratio range | typical subject | applied width |
+|-------------|----------------|---------------|
+| ≥ 2.0 | wide figures, tables | ~860px |
+| 1.5–2.0 | landscape screenshots | ~700px |
+| 1.0–1.5 | square-ish images | ~500px |
+| < 1.0 | portrait / paper scans | ~380px |
+
+Requires Pillow: `pip install Pillow`
+
+---
+
 ## Uninstall
 
 ```bash
 rm -rf ~/.claude/skills/orchestrate
 rm -rf ~/.claude/skills/repo-context
+rm -rf ~/.claude/skills/md-img-resize
 ```
 
 ## License

@@ -10,6 +10,7 @@ Personal Claude Code skills — shared online, installed manually on each machin
 | [`/repo-context`](#repo-context) | Manual | Read CLAUDE.md + README to orient in any repo |
 | [`/git-pull-push`](#git-pull-push) | Manual | Pull → commit → push in one shot; auto-resolves conflicts with up to 5 Opus agents |
 | [`/md-img-resize`](#md-img-resize) | Manual | Auto-resize markdown image widths based on actual image dimensions |
+| [`/skill-publish`](#skill-publish) | Manual | Publish a ~/.claude/skills skill to the claude-commands repo, update README, and push |
 
 ---
 
@@ -34,6 +35,10 @@ cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
 # md-img-resize
 mkdir -p ~/.claude/skills/md-img-resize
 cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
+
+# skill-publish
+mkdir -p ~/.claude/skills/skill-publish
+cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
 ```
 
 Restart Claude Code — skills will be active.
@@ -48,6 +53,7 @@ cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
 cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
 cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
 cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
+cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
 ```
 
 ---
@@ -125,6 +131,16 @@ Requires Pillow: `pip install Pillow`
 
 ---
 
+## skill-publish
+
+Publishes a `~/.claude/skills/<name>` skill to this repo. Reads `description` and `argument-hint` from SKILL.md frontmatter, then automatically updates README (table, Install, Update, Uninstall, description section) and commits + pushes.
+
+```
+/skill-publish <skill-name>
+```
+
+---
+
 ## Uninstall
 
 ```bash
@@ -132,6 +148,7 @@ rm -rf ~/.claude/skills/orchestrate
 rm -rf ~/.claude/skills/repo-context
 rm -rf ~/.claude/skills/git-pull-push
 rm -rf ~/.claude/skills/md-img-resize
+rm -rf ~/.claude/skills/skill-publish
 ```
 
 ## License

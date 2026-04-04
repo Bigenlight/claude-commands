@@ -11,6 +11,7 @@ Personal Claude Code skills — shared online, installed manually on each machin
 | [`/git-pull-push`](#git-pull-push) | Manual | Pull → commit → push in one shot; auto-resolves conflicts with up to 5 Opus agents |
 | [`/md-img-resize`](#md-img-resize) | Manual | Auto-resize markdown image widths based on actual image dimensions |
 | [`/skill-publish`](#skill-publish) | Manual | Publish a ~/.claude/skills skill to the claude-commands repo, update README, and push |
+| [`/weekly-review`](#weekly-review) | Manual | Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation |
 
 ---
 
@@ -39,6 +40,10 @@ cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
 # skill-publish
 mkdir -p ~/.claude/skills/skill-publish
 cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
+
+# weekly-review
+mkdir -p ~/.claude/skills/weekly-review
+cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
 ```
 
 Restart Claude Code — skills will be active.
@@ -54,6 +59,7 @@ cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
 cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
 cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
 cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
+cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
 ```
 
 ---
@@ -141,6 +147,18 @@ Publishes a `~/.claude/skills/<name>` skill to this repo. Reads `description` an
 
 ---
 
+## weekly-review
+
+PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이터 병렬 수집 → Opus로 종합 작성 → Opus로 검수하는 3-phase 파이프라인.
+
+```
+/weekly-review (optional) specific week like "2026-W15" — defaults to current week
+```
+
+수집 대상: 데일리 노트, 미팅 노트, inbox/root 노트, review-due 노트, git log, 프로젝트/영역 상태. 최종 보고 시 참고한 전체 파일 목록 출력.
+
+---
+
 ## Uninstall
 
 ```bash
@@ -149,6 +167,7 @@ rm -rf ~/.claude/skills/repo-context
 rm -rf ~/.claude/skills/git-pull-push
 rm -rf ~/.claude/skills/md-img-resize
 rm -rf ~/.claude/skills/skill-publish
+rm -rf ~/.claude/skills/weekly-review
 ```
 
 ## License

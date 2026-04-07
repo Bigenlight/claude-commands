@@ -22,6 +22,7 @@ allowed-tools: [Bash, Read, Edit, Agent]
 
 ### 3. Pull (rebase)
 - `git pull --rebase` 실행
+- 현재 변경점이 없어도 리모트에 있을 수 있으니 무조건 실행
 - **충돌 발생 시** → 아래 충돌 해결 섹션으로
 
 ### 4. Push

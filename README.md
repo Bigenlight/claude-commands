@@ -12,6 +12,7 @@ Personal Claude Code skills — shared online, installed manually on each machin
 | [`/md-img-resize`](#md-img-resize) | Manual | Auto-resize markdown image widths based on actual image dimensions |
 | [`/skill-publish`](#skill-publish) | Manual | Publish a ~/.claude/skills skill to the claude-commands repo, update README, and push |
 | [`/weekly-review`](#weekly-review) | Manual | Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation |
+| [`/us-stock-advisor`](#us-stock-advisor) | Manual | 미국 주식 시장 조사 + 전략 판단 + 리스크 리뷰를 멀티에이전트로 수행하고, 결과를 슬랙 DM으로 전송 |
 
 ---
 
@@ -44,6 +45,10 @@ cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
 # weekly-review
 mkdir -p ~/.claude/skills/weekly-review
 cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
+
+# us-stock-advisor
+mkdir -p ~/.claude/skills/us-stock-advisor
+cp skills/us-stock-advisor/SKILL.md ~/.claude/skills/us-stock-advisor/SKILL.md
 ```
 
 Restart Claude Code — skills will be active.
@@ -60,6 +65,7 @@ cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
 cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
 cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
 cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
+cp skills/us-stock-advisor/SKILL.md ~/.claude/skills/us-stock-advisor/SKILL.md
 ```
 
 ---
@@ -159,6 +165,16 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 
 ---
 
+## us-stock-advisor
+
+미국 주식 시장 조사 + 전략 판단 + 리스크 리뷰를 멀티에이전트로 수행하고, 결과를 슬랙 DM으로 전송. 뉴스·매크로·기술적 분석 → 전략 수립 → 리스크 검토 → 검증 → 슬랙 보고 파이프라인. KIS API/실거래 없이 순수 리서치·판단만.
+
+```
+/us-stock-advisor <포트폴리오 정보 — 현금 잔고(USD), 보유 종목(ticker, 수량, 평단가)>
+```
+
+---
+
 ## Uninstall
 
 ```bash
@@ -168,6 +184,7 @@ rm -rf ~/.claude/skills/git-pull-push
 rm -rf ~/.claude/skills/md-img-resize
 rm -rf ~/.claude/skills/skill-publish
 rm -rf ~/.claude/skills/weekly-review
+rm -rf ~/.claude/skills/us-stock-advisor
 ```
 
 ## License

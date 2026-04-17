@@ -89,6 +89,7 @@ prompt: |
   Also search for social sentiment:
   - "{ticker} stock reddit" or "wallstreetbets {ticker}"
   - "{ticker} stock twitter/X sentiment today"
+  - "{ticker} stocktwits sentiment" or "stocktwits {ticker} bulls bears"
   - "pre-market movers today" or "after hours movers today" (based on current session)
 
   ## Output Format (JSON, English)
@@ -147,8 +148,8 @@ prompt: |
   10. Analyst upgrades / downgrades
 
   Also search for:
-  - "commodity stocks reddit today"
-  - "energy stocks sentiment" or "oil price outlook today"
+  - "commodity stocks reddit today" or "r/stocks energy"
+  - "energy stocks sentiment stocktwits" or "oil price outlook today"
 
   ## Output Format (JSON, English)
   Same JSON array format as Agent 1. One entry per ticker.
@@ -375,14 +376,14 @@ prompt: |
         "ticker": "NVDA",
         "action": "BUY",
         "entry_price": 198.50,
-        "target_price": 230.00,
+        "target_price": 235.00,
         "stop_loss_price": 179.00,
         "position_size_pct": 0.30,
         "confidence": 0.80,
         "rationale": "Detailed 3-5 sentence rationale in English. Include news catalyst + technical basis + R/R calculation.",
         "reason_for_action": "NEW_ENTRY",
         "exchange": "NASD",
-        "reward_risk_ratio": 1.62
+        "reward_risk_ratio": 1.87
       }
     ]
   }

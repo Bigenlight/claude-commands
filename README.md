@@ -13,6 +13,7 @@ Personal Claude Code skills — shared online, installed manually on each machin
 | [`/skill-publish`](#skill-publish) | Manual | Publish a ~/.claude/skills skill to the claude-commands repo, update README, and push |
 | [`/weekly-review`](#weekly-review) | Manual | Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation |
 | [`/us-stock-advisor`](#us-stock-advisor) | Manual | 미국 주식 시장 조사 + 전략 판단 + 리스크 리뷰를 멀티에이전트로 수행하고, 결과를 슬랙 DM으로 전송 |
+| [`/multi-agent-research`](#multi-agent-research) | Manual | Survey/compare/verify 5+ papers·docs·repos and produce a single consolidated markdown report — Sonnet × N parallel extraction + Opus audit + Opus consolidation pipeline |
 
 ---
 
@@ -49,6 +50,10 @@ cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
 # us-stock-advisor
 mkdir -p ~/.claude/skills/us-stock-advisor
 cp skills/us-stock-advisor/SKILL.md ~/.claude/skills/us-stock-advisor/SKILL.md
+
+# multi-agent-research
+mkdir -p ~/.claude/skills/multi-agent-research
+cp skills/multi-agent-research/SKILL.md ~/.claude/skills/multi-agent-research/SKILL.md
 ```
 
 Restart Claude Code — skills will be active.
@@ -66,6 +71,7 @@ cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
 cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
 cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
 cp skills/us-stock-advisor/SKILL.md ~/.claude/skills/us-stock-advisor/SKILL.md
+cp skills/multi-agent-research/SKILL.md ~/.claude/skills/multi-agent-research/SKILL.md
 ```
 
 ---
@@ -175,6 +181,18 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 
 ---
 
+## multi-agent-research
+
+여러 자료(논문·문서·리포·사이트 ≥5개)를 비교·검증해서 단일 markdown 보고서로 정리하는 multi-agent 파이프라인. Sonnet × N 병렬 추출 + Opus 감사 + Opus 최종 작성의 7-phase 구조 (Identify → Canonical deep-dive → Per-source extract → Reference clone+verify → Audit × 2 → Targeted re-extract → Consolidate). `orchestrate`(코딩)·`review`(단일 리포)와 달리 reading + synthesis 작업 전용. ≤4 sources이면 단일 Agent로 충분하므로 skip.
+
+```
+/multi-agent-research <topic and what facts to extract across sources>
+```
+
+핵심 컨벤션: `findings/` 폴더에 모든 산출물 저장, `_progress.md` source × fact 매트릭스로 lens-mutation 추적, citation 의무 (PDF/code/web 형식 분리), no-fabrication 룰. 최종 산출물은 working dir 루트의 `<TOPIC>_SURVEY.md`.
+
+---
+
 ## Uninstall
 
 ```bash
@@ -185,6 +203,7 @@ rm -rf ~/.claude/skills/md-img-resize
 rm -rf ~/.claude/skills/skill-publish
 rm -rf ~/.claude/skills/weekly-review
 rm -rf ~/.claude/skills/us-stock-advisor
+rm -rf ~/.claude/skills/multi-agent-research
 ```
 
 ## License

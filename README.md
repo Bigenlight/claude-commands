@@ -1,6 +1,8 @@
-# claude-commands
+# Claude Code Skills (Theo's personal collection)
 
-Personal Claude Code skills — shared online, installed manually on each machine.
+Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 9개 스킬 전부 활성화.
+
+> **2026-05-04 마이그레이션**: 기존 `~/claude-commands/skills/<name>/` → `~/.claude/skills/<name>/` 평탄 구조로 변경. 자세한 내용은 하단 [legacy 섹션](#이전-구조-legacy) 참고.
 
 ## Skills
 
@@ -18,67 +20,41 @@ Personal Claude Code skills — shared online, installed manually on each machin
 
 ---
 
-## Install (all skills)
+## Install
 
 ```bash
-git clone git@github.com:Bigenlight/claude-commands.git
-cd claude-commands
+# SSH (권장 — GitHub 키 등록된 PC)
+git clone git@github.com:Bigenlight/claude-commands.git ~/.claude/skills
 
-# orchestrate
-mkdir -p ~/.claude/skills/orchestrate
-cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
-
-# repo-context
-mkdir -p ~/.claude/skills/repo-context
-cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
-
-# git-pull-push
-mkdir -p ~/.claude/skills/git-pull-push
-cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
-
-# md-img-resize
-mkdir -p ~/.claude/skills/md-img-resize
-cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
-
-# skill-publish
-mkdir -p ~/.claude/skills/skill-publish
-cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
-
-# weekly-review
-mkdir -p ~/.claude/skills/weekly-review
-cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
-
-# us-stock-advisor
-mkdir -p ~/.claude/skills/us-stock-advisor
-cp skills/us-stock-advisor/SKILL.md ~/.claude/skills/us-stock-advisor/SKILL.md
-
-# multi-agent-research
-mkdir -p ~/.claude/skills/multi-agent-research
-cp skills/multi-agent-research/SKILL.md ~/.claude/skills/multi-agent-research/SKILL.md
-
-# paper-digest
-mkdir -p ~/.claude/skills/paper-digest
-cp skills/paper-digest/SKILL.md ~/.claude/skills/paper-digest/SKILL.md
+# HTTPS (SSH 키 없는 PC)
+git clone https://github.com/Bigenlight/claude-commands.git ~/.claude/skills
 ```
 
-Restart Claude Code — skills will be active.
+Restart Claude Code — 9개 스킬 전부 자동 활성화.
 
-## Update (all skills)
+> 이미 `~/.claude/skills/` 디렉토리가 있으면 먼저 백업하거나 비워야 함. swap 절차는 [legacy 섹션](#이전-구조-legacy) 참고.
+
+## Update
 
 ```bash
-cd claude-commands
+cd ~/.claude/skills
 git pull
-
-cp skills/orchestrate/SKILL.md ~/.claude/skills/orchestrate/SKILL.md
-cp skills/repo-context/SKILL.md ~/.claude/skills/repo-context/SKILL.md
-cp skills/git-pull-push/SKILL.md ~/.claude/skills/git-pull-push/SKILL.md
-cp skills/md-img-resize/SKILL.md ~/.claude/skills/md-img-resize/SKILL.md
-cp skills/skill-publish/SKILL.md ~/.claude/skills/skill-publish/SKILL.md
-cp skills/weekly-review/SKILL.md ~/.claude/skills/weekly-review/SKILL.md
-cp skills/us-stock-advisor/SKILL.md ~/.claude/skills/us-stock-advisor/SKILL.md
-cp skills/multi-agent-research/SKILL.md ~/.claude/skills/multi-agent-research/SKILL.md
-cp skills/paper-digest/SKILL.md ~/.claude/skills/paper-digest/SKILL.md
 ```
+
+`git pull` 한 번이면 모든 스킬 동기화. cp 작업 없음.
+
+## Publish (변경사항 push)
+
+스킬을 수정했으면 그대로 commit·push:
+
+```bash
+cd ~/.claude/skills
+git add <skill-name>/
+git commit -m "feat(<skill>): ..."
+git push
+```
+
+또는 `/skill-publish <skill-name>` 스킬 사용.
 
 ---
 
@@ -218,16 +194,59 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 ## Uninstall
 
 ```bash
-rm -rf ~/.claude/skills/orchestrate
-rm -rf ~/.claude/skills/repo-context
-rm -rf ~/.claude/skills/git-pull-push
-rm -rf ~/.claude/skills/md-img-resize
-rm -rf ~/.claude/skills/skill-publish
-rm -rf ~/.claude/skills/weekly-review
-rm -rf ~/.claude/skills/us-stock-advisor
-rm -rf ~/.claude/skills/multi-agent-research
-rm -rf ~/.claude/skills/paper-digest
+# 전체 제거 — 다른 도구가 ~/.claude/skills에 파일을 안 두고 있다면
+rm -rf ~/.claude/skills
+
+# 특정 스킬만
+rm -rf ~/.claude/skills/<skill-name>
 ```
+
+---
+
+## 이전 구조 (legacy)
+
+2026-05-04 이전에는 다음 구조였음:
+
+```
+~/claude-commands/
+├── skills/
+│   ├── orchestrate/SKILL.md
+│   ├── paper-digest/SKILL.md
+│   └── ...
+```
+
+매번 `cp skills/<name>/SKILL.md ~/.claude/skills/<name>/SKILL.md`로 손수 복사해야 했음.
+
+**현재 구조** (평탄화):
+
+```
+~/.claude/skills/         ← repo가 곧 이 디렉토리
+├── orchestrate/SKILL.md
+├── paper-digest/SKILL.md
+├── ...
+└── .git/
+```
+
+`git clone ... ~/.claude/skills` 한 번으로 끝. cp 단계 제거.
+
+### 기존 PC swap 절차
+
+기존 `~/claude-commands/` + 별도 `~/.claude/skills/` 가 있는 PC에서는 **새 셸**(Claude Code 세션 외부)에서:
+
+```bash
+# 1. 기존 ~/.claude/skills 백업
+mv ~/.claude/skills ~/.claude/skills.bak.$(date +%Y%m%d)
+
+# 2. 새 구조로 clone
+git clone git@github.com:Bigenlight/claude-commands.git ~/.claude/skills
+
+# 3. 검증 후 백업 + 옛 claude-commands 폴더 삭제
+ls ~/.claude/skills
+rm -rf ~/.claude/skills.bak.*
+rm -rf ~/claude-commands
+```
+
+> **주의**: Claude Code 실행 중인 셸에서 `~/.claude/skills/`를 swap하면 진행 중 세션이 깨질 수 있음 (ENOENT). 반드시 새 터미널에서.
 
 ## License
 

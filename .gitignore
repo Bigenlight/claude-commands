@@ -1,8 +1,19 @@
-# OS
+# OS junk
 .DS_Store
 Thumbs.db
-
-# Editor
 *.swp
 *.swo
 *~
+
+# Python venv (us-stock-advisor)
+**/.venv/
+**/__pycache__/
+*.pyc
+
+# Editors
+.vscode/
+.idea/
+
+# Specific tmp files (광범위 패턴 회피 — 특정 경로만)
+multi-agent-research/REVIEW.md
+multi-agent-research/REVIEW_v2.md

@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: Use this skill when the user asks to generate a weekly review, 주간 리뷰 작성, weekly summary, or /weekly-review. Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation.
-version: 1.0.0
+version: 1.1.0
 argument-hint: (optional) specific week like "2026-W15" — defaults to current week
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent]
 ---
@@ -425,10 +425,11 @@ tags:
    - 없으면 "이번 주 새 permanent note 없음"
 
 8. **아쉬운 점 / 개선할 것**
-   - 반복적으로 미완료된 To do 항목 (여러 날 걸쳐 나타나는 [ ])
+   - 반복적으로 미완료된 To do 항목 (여러 날 걸쳐 계속 carry-over 되며 `[ ]`로 끌려다니는 것) ← 이게 진짜 "막힌" task
    - inbox에 오래 방치된 것
    - 구조적 개선 사항
    - 이전 주 목표 중 달성 못한 것
+   - **주의 (취소된 task 구분)**: 어떤 `[ ]` 미완료 항목이 **그 다음 날 노트에서 carry-over 안 되고 그냥 사라졌으면**(삭제됐으면), 더 이상 진행 안 하거나 취소된 task일 확률이 가장 높음 ← 이런 항목은 "아쉬운 점"이나 부정적 피드백으로 쓰지 말 것. **여러 날 계속 `[ ]`로 carry-over 되는 것만 진짜 미완료로 취급.** (애매하면 부정 피드백 대신 다음 주 목표 후보로만 가볍게 언급하거나 아예 빼기)
 
 9. **다음 주 목표**
    - 서브섹션: Domain A (3D VLA) / Domain B (Value Function) / 개인 공부
@@ -497,8 +498,9 @@ Phase 2가 작성한 파일을 읽고, Phase 1 데이터와 대조하여 검수.
 
 1. **데일리 To do 반영 여부**
    - 모든 완료 항목 `[x]`이 리뷰에 반영되었는가?
-   - 미완료 항목 `[ ]`이 "아쉬운 점" 또는 "다음 주 목표"에 반영되었는가?
-   - 누락된 항목이 있으면 명시
+   - 여러 날에 걸쳐 carry-over 되며 계속 미완료인 `[ ]` 항목이 "아쉬운 점" 또는 "다음 주 목표"에 반영되었는가?
+   - **예외 (취소된 task)**: 어떤 `[ ]` 항목이 다음 날 노트에서 carry-over 안 되고 그냥 사라졌으면(삭제) 취소/중단된 task로 보고 부정적 피드백("아쉬운 점")에 넣지 않은 게 맞음 ← 오히려 이런 항목이 "아쉬운 점"에 들어가 있으면 빼라고 지적할 것
+   - 누락된 항목이 있으면 명시 (단, 위 예외에 해당해 사라진 항목은 "누락"이 아님 — 정상 처리)
 
 2. **미팅 반영 여부**
    - 이번 주 모든 미팅이 해당 섹션(3D VLA/Value Function/개인 공부)에 언급되었는가?

@@ -77,7 +77,7 @@ Auto-classifies complexity (LOW / MEDIUM / HIGH / CRITICAL) and selects an execu
 | **MAP_REDUCE** | 10+ files needing similar changes — up to 5 workers per batch |
 | **HIERARCHICAL** | Architecture-wide changes — CEO → Sub-Orchestrators → Workers |
 
-Model selection is automatic: Sonnet for coding, Opus for planning (HIGH+), reviews, and verification.
+Model selection is automatic: Sonnet for workers (coding), Fable for the top judgment/strategy gates — planning (HIGH+), reviews, and verification.
 
 ---
 

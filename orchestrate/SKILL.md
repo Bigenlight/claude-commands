@@ -1,7 +1,7 @@
 ---
 name: orchestrate
-description: Use this skill when the user asks to orchestrate a complex task, coordinate multiple agents, run a multi-agent workflow, use parallel agents, delegate work to sub-agents, or needs a structured multi-phase pipeline (plan → code → test → review). Provides a complete multi-agent orchestration system with complexity-based model selection (sonnet/opus) and execution modes (STANDARD, TEAM_OF_TEAMS, MAP_REDUCE, HIERARCHICAL).
-version: 1.0.0
+description: Use this skill when the user asks to orchestrate a complex task, coordinate multiple agents, run a multi-agent workflow, use parallel agents, delegate work to sub-agents, or needs a structured multi-phase pipeline (plan → code → test → review). Provides a complete multi-agent orchestration system with complexity-based model selection (sonnet for workers, fable for top-level judgment/strategy gates) and execution modes (STANDARD, TEAM_OF_TEAMS, MAP_REDUCE, HIERARCHICAL).
+version: 1.1.0
 argument-hint: <task description>
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent]
 ---
@@ -25,8 +25,8 @@ $ARGUMENTS
 |-------|----------|---------|--------|--------|
 | **LOW** | Single-line fix, typo, config value change, renaming | `sonnet` | 1× `sonnet` | skip (or quick) |
 | **MEDIUM** | Bug fix (1-3 files), small feature, adding a guard/check | `sonnet` | 1-2× `sonnet` | `sonnet` |
-| **HIGH** | New feature (cross-file), refactoring, architectural change, security-sensitive | **`opus`** | 2-3× `sonnet` | `sonnet` |
-| **CRITICAL** | System redesign, multi-module overhaul, high-risk production changes | **`opus`** | 2-3× `sonnet` + fix cycles | `sonnet` |
+| **HIGH** | New feature (cross-file), refactoring, architectural change, security-sensitive | **`fable`** | 2-3× `sonnet` | `sonnet` |
+| **CRITICAL** | System redesign, multi-module overhaul, high-risk production changes | **`fable`** | 2-3× `sonnet` + fix cycles | `sonnet` |
 
 ### Part B: Execution Mode
 
@@ -48,8 +48,10 @@ Reason: [one sentence justifying both choices]
 ```
 
 **Rules:**
-- Reviewer and Verifier are **always `opus`** regardless of level or mode.
+- Reviewer and Verifier are **always `fable`** (the top judgment gate) regardless of level or mode.
 - Reporter is **always `sonnet`** regardless of level or mode.
+- Workers (Coders, Team Leads, Map Workers, Sub-Orchestrators, Implementers) are **always `sonnet`**.
+- `fable` is reserved for top-level judgment & strategy roles: Reviewer, Verifier, Judge, Integration Reviewer, CEO, Reducer, Strategic Planner, Design Framer, and the Planner on HIGH/CRITICAL tasks.
 - For LOW tasks: you MAY skip the Tester phase if the change is trivially verifiable.
 - When in doubt about mode, default to STANDARD. Escalate only when the task clearly warrants it.
 - For LOW/MEDIUM complexity, STANDARD is almost always correct.
@@ -111,7 +113,7 @@ Spawn a single **PLANNER** agent (do NOT run in background — wait for result):
 
 ```
 subagent_type: "general-purpose"
-model: "[sonnet for LOW/MEDIUM, opus for HIGH/CRITICAL — from Step 0]"
+model: "[sonnet for LOW/MEDIUM, fable for HIGH/CRITICAL — from Step 0]"
 prompt:
   You are the PLANNER in a multi-agent coding pipeline.
 
@@ -245,15 +247,15 @@ prompt:
 
 ---
 
-### Phase 4: Review (Opus — MANDATORY, do NOT use Sonnet)
+### Phase 4: Review (Fable — MANDATORY, do NOT downgrade)
 
-Spawn a single **REVIEWER** agent with Opus:
+Spawn a single **REVIEWER** agent with Fable:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
-  You are the REVIEWER (Opus) in a multi-agent coding pipeline. This is a critical quality gate.
+  You are the REVIEWER (Fable) in a multi-agent coding pipeline. This is a critical quality gate.
 
   ## Original Task
   <task>$ARGUMENTS</task>
@@ -302,15 +304,15 @@ prompt:
 
 ---
 
-### Phase 5: Verification (Opus — MANDATORY, do NOT use Sonnet)
+### Phase 5: Verification (Fable — MANDATORY, do NOT downgrade)
 
-Spawn a single **VERIFIER** agent with Opus:
+Spawn a single **VERIFIER** agent with Fable:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
-  You are the VERIFIER (Opus) — the final quality gate before completion.
+  You are the VERIFIER (Fable) — the final quality gate before completion.
 
   ## Original Task
   <task>$ARGUMENTS</task>
@@ -418,13 +420,13 @@ After the Reporter completes, **display the full Orchestration Report to the use
 
 Use when the task involves 2+ clearly independent modules that can be developed simultaneously. Maximum 4 sub-teams.
 
-### TT-Phase 1: Strategic Planning (Opus)
+### TT-Phase 1: Strategic Planning (Fable)
 
 Spawn a single **STRATEGIC PLANNER** agent:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
   You are the STRATEGIC PLANNER for a Team-of-Teams operation.
 
@@ -505,15 +507,15 @@ prompt:
 
 Wait for ALL teams to complete.
 
-### TT-Phase 3: Integration Review (Opus — MANDATORY)
+### TT-Phase 3: Integration Review (Fable — MANDATORY)
 
 Spawn a single **INTEGRATION REVIEWER** agent:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
-  You are the INTEGRATION REVIEWER (Opus) for a Team-of-Teams operation.
+  You are the INTEGRATION REVIEWER (Fable) for a Team-of-Teams operation.
 
   ## Original Task
   <task>$ARGUMENTS</task>
@@ -556,7 +558,7 @@ prompt:
 
 **If REQUEST_CHANGES**: spawn targeted Coder agents for only the affected teams. Max 2 fix cycles.
 
-### TT-Phase 4: Verification (Opus) and Reporting (Sonnet)
+### TT-Phase 4: Verification (Fable) and Reporting (Sonnet)
 
 Run Verification and Reporting using the same templates as STANDARD Phase 5 and Phase 6.
 
@@ -566,7 +568,7 @@ Run Verification and Reporting using the same templates as STANDARD Phase 5 and 
 
 Use when 10+ files need identical or similar independent transformations (style changes, annotation additions, migration patterns, etc.). Max 5 Workers per batch.
 
-### MR-Phase 1: Map Planning (Sonnet or Opus per complexity)
+### MR-Phase 1: Map Planning (Sonnet or Fable per complexity)
 
 Spawn a single **MAP PLANNER** agent:
 
@@ -642,15 +644,15 @@ prompt:
 
 Wait for all batches. Check checkpoints. Re-spawn only FAILED batches (max 2 retries per batch).
 
-### MR-Phase 3: Reduce (Opus — MANDATORY)
+### MR-Phase 3: Reduce (Fable — MANDATORY)
 
 Spawn a single **REDUCER** agent:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
-  You are the REDUCER (Opus) for a Map-Reduce operation.
+  You are the REDUCER (Fable) for a Map-Reduce operation.
 
   ## Original Task
   <task>$ARGUMENTS</task>
@@ -700,15 +702,15 @@ Use STANDARD Phase 6 Reporting template, substituting Reducer output for Verifie
 
 Use for architecture-wide changes that require coordinated judgment at multiple levels. Three tiers: CEO, Sub-Orchestrators, Workers.
 
-### H-Phase 1: CEO Strategic Plan (Opus)
+### H-Phase 1: CEO Strategic Plan (Fable)
 
 Spawn a single **CEO** agent:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
-  You are the CEO (Opus) for a Hierarchical Orchestration.
+  You are the CEO (Fable) for a Hierarchical Orchestration.
 
   ## Task
   <task>$ARGUMENTS</task>
@@ -789,14 +791,14 @@ prompt:
 ```
 
 After all Sub-Orchestrators complete:
-- If any escalations exist, present them to a new **CEO DECISION** agent (Opus) for resolution, then re-spawn affected Sub-Orchestrators.
+- If any escalations exist, present them to a new **CEO DECISION** agent (Fable) for resolution, then re-spawn affected Sub-Orchestrators.
 - Max 2 escalation rounds.
 
-### H-Phase 3: Integration Verification (Opus — MANDATORY)
+### H-Phase 3: Integration Verification (Fable — MANDATORY)
 
-Use the same Integration Reviewer template from TEAM_OF_TEAMS TT-Phase 3, but adapted for workstreams instead of teams. The Opus Reviewer verifies cross-workstream compatibility.
+Use the same Integration Reviewer template from TEAM_OF_TEAMS TT-Phase 3, but adapted for workstreams instead of teams. The Fable Reviewer verifies cross-workstream compatibility.
 
-### H-Phase 4: Verification (Opus) and Reporting (Sonnet)
+### H-Phase 4: Verification (Fable) and Reporting (Sonnet)
 
 Run STANDARD Phase 5 (Verification) and Phase 6 (Reporting).
 
@@ -806,15 +808,15 @@ Run STANDARD Phase 5 (Verification) and Phase 6 (Reporting).
 
 Use when the task involves a design decision that is hard to reverse (DB schema, API interface, algorithm choice). Spawn 2-3 competing implementations, then pick the best.
 
-### S-Phase 1: Option Framing (Opus)
+### S-Phase 1: Option Framing (Fable)
 
 Spawn a single **DESIGN FRAMER** agent:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
-  You are the DESIGN FRAMER (Opus) for a Speculative Execution.
+  You are the DESIGN FRAMER (Fable) for a Speculative Execution.
 
   ## Task
   <task>$ARGUMENTS</task>
@@ -903,15 +905,15 @@ prompt:
   - [key trade-off explanations]
 ```
 
-### S-Phase 3: Judging (Opus — MANDATORY)
+### S-Phase 3: Judging (Fable — MANDATORY)
 
 Spawn a single **JUDGE** agent:
 
 ```
 subagent_type: "general-purpose"
-model: "opus"
+model: "fable"
 prompt:
-  You are the JUDGE (Opus) for a Speculative Execution.
+  You are the JUDGE (Fable) for a Speculative Execution.
 
   ## Original Task
   <task>$ARGUMENTS</task>
@@ -952,7 +954,7 @@ prompt:
 
 Spawn a **CODER** agent to apply the winning option's changes to the actual codebase, incorporating any improvements from the Judge.
 
-### S-Phase 5: Review (Opus), Verification (Opus), Reporting (Sonnet)
+### S-Phase 5: Review (Fable), Verification (Fable), Reporting (Sonnet)
 
 Run STANDARD Phase 4, 5, and 6 on the applied changes.
 
@@ -964,8 +966,8 @@ Run STANDARD Phase 4, 5, and 6 on the applied changes.
 2. **Declare mode explicitly**: Always begin with `"Mode: [MODE], Complexity: [LEVEL]"` before any work.
 3. **Pass full context**: Never summarize or truncate previous agent outputs when passing to next agents. Insert verbatim.
 4. **Parallel = efficiency**: When the plan identifies independent work, spawn agents simultaneously.
-5. **Opus gates are non-negotiable**: Reviewer, Verifier, Judge, Integration Reviewer, CEO, and Reducer MUST use `model: "opus"`. Never substitute Sonnet for these roles.
-6. **Adaptive Planner**: LOW/MEDIUM → Sonnet Planner. HIGH/CRITICAL → Opus Planner. When in doubt, go one level up.
+5. **Fable gates are non-negotiable**: Reviewer, Verifier, Judge, Integration Reviewer, CEO, Reducer, Strategic Planner, and Design Framer MUST use `model: "fable"` (the top judgment/strategy tier). Never downgrade these roles to Sonnet or Opus.
+6. **Adaptive Planner**: LOW/MEDIUM → Sonnet Planner. HIGH/CRITICAL → Fable Planner. When in doubt, go one level up.
 7. **LOW task shortcut**: If complexity is LOW, Tester phase may be skipped. Jump directly to Reviewer after Coder.
 8. **Retry limits**: Max 2 cycles for any fix/escalation loop. Report failures honestly.
 9. **No unsolicited commits**: Never run `git commit` unless the task explicitly requests it.

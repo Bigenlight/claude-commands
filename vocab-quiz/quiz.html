@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>📚 영어 단어/개념 퀴즈</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  :root{
+    --bg1:#6a82fb; --bg2:#fc5c7d; --card:#ffffff; --ink:#2b2d42;
+    --muted:#8d99ae; --line:#edf0f5;
+    --know:#2ecc71; --dont:#f39c12; --right:#27ae60; --wrong:#e74c3c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+    color:var(--ink);
+    background:linear-gradient(135deg,#a18cd1 0%,#6a82fb 38%,#fc5c7d 100%);
+    background-attachment:fixed;
+    min-height:100vh; display:flex; flex-direction:column;
+    align-items:center; padding:24px 16px;
+  }
+  .wrap{width:100%; max-width:680px}
+  header{color:#fff; text-align:center; margin-bottom:18px; text-shadow:0 2px 8px rgba(0,0,0,.18)}
+  header h1{margin:0 0 6px; font-size:24px; letter-spacing:-.5px}
+  header .sub{opacity:.9; font-size:14px}
+  .bar{height:8px; background:rgba(255,255,255,.3); border-radius:99px; overflow:hidden; margin:14px 0 4px}
+  .bar > i{display:block; height:100%; width:0; background:linear-gradient(90deg,#fff,#ffe6f0); transition:width .35s ease}
+  .meta{display:flex; justify-content:space-between; color:#fff; font-size:13px; opacity:.95}
+  .card{
+    background:var(--card); border-radius:20px; padding:26px 24px 22px;
+    box-shadow:0 18px 50px rgba(40,30,80,.28); margin-top:16px;
+  }
+  .tag{display:inline-block; font-size:12px; font-weight:700; padding:4px 11px; border-radius:99px; margin-bottom:14px}
+  .tag.concept{background:#eef2ff; color:#5b6bdf}
+  .tag.vocab{background:#fff0f5; color:#e056a0}
+  .q{font-size:21px; line-height:1.5; font-weight:600; word-break:break-word}
+  .q b{color:#e056a0}
+  .answer{
+    margin-top:18px; padding-top:16px; border-top:1px dashed var(--line);
+    font-size:16px; line-height:1.65; color:#33405a; display:none;
+  }
+  .answer.show{display:block; animation:fade .3s ease}
+  .answer .lbl{font-size:12px; font-weight:700; color:var(--muted); letter-spacing:1px; margin-bottom:6px}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .btns{display:flex; gap:12px; margin-top:22px}
+  button{
+    flex:1; border:0; border-radius:14px; padding:15px 10px; font-size:16px;
+    font-weight:700; cursor:pointer; color:#fff; transition:transform .08s, filter .15s;
+    font-family:inherit;
+  }
+  button:active{transform:scale(.97)}
+  button:hover{filter:brightness(1.06)}
+  .b-know{background:var(--know)}
+  .b-dont{background:var(--dont)}
+  .b-right{background:var(--right)}
+  .b-wrong{background:var(--wrong)}
+  .b-next{background:#6a82fb}
+  .hint{text-align:center; color:var(--muted); font-size:13px; margin-top:14px}
+  /* 결과 화면 */
+  .done{background:var(--card); border-radius:20px; padding:30px 26px; box-shadow:0 18px 50px rgba(40,30,80,.28); margin-top:16px; text-align:center}
+  .done h2{margin:0 0 18px}
+  .scores{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:18px}
+  .score{flex:1; min-width:90px; padding:16px 8px; border-radius:14px; background:#f7f8fc}
+  .score .n{font-size:30px; font-weight:800}
+  .score .l{font-size:13px; color:var(--muted); margin-top:2px}
+  .score.k .n{color:var(--right)} .score.r .n{color:var(--dont)} .score.w .n{color:var(--wrong)}
+  .savemsg{font-size:14px; color:var(--muted); margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📚 영어 단어 / 개념 퀴즈</h1>
+    <div class="sub">예문 보고 안다/모른다 → 정답 확인 → 채점</div>
+  </header>
+
+  <div class="bar"><i id="prog"></i></div>
+  <div class="meta"><span id="counter">0 / 0</span><span id="live">✅ 0 · 🔁 0 · ❌ 0</span></div>
+
+  <div id="stage"></div>
+</div>
+
+<script>
+let items = [], i = 0, status = {}, choice = null;
+const stage = document.getElementById('stage');
+
+function r(md){ try{ return marked.parse(md); }catch(e){ return md.replace(/\n/g,'<br>'); } }
+function counts(){
+  let k=0,r=0,w=0;
+  for(const v of Object.values(status)){ if(v==='known')k++; else if(v==='review')r++; else if(v==='wrong')w++; }
+  return {k,r,w};
+}
+function updateMeta(){
+  document.getElementById('counter').textContent = `${Math.min(i+1,items.length)} / ${items.length}`;
+  document.getElementById('prog').style.width = (i/items.length*100)+'%';
+  const c=counts();
+  document.getElementById('live').textContent = `✅ ${c.k} · 🔁 ${c.r} · ❌ ${c.w}`;
+}
+
+function render(){
+  if(i>=items.length){ return finish(); }
+  updateMeta();
+  choice=null;
+  const it=items[i];
+  const tag = it.section==='concept'
+     ? '<span class="tag concept">🧠 개념</span>'
+     : '<span class="tag vocab">🔤 단어·표현</span>';
+  stage.innerHTML = `
+    <div class="card">
+      ${tag}
+      <div class="q">${it.summary}</div>
+      <div class="answer" id="ans"><div class="lbl">정답</div>${r(it.body)}</div>
+      <div class="btns" id="btns">
+        <button class="b-know" onclick="pick('know')">안다</button>
+        <button class="b-dont" onclick="pick('dont')">모른다</button>
+      </div>
+      <div class="hint">아는지 먼저 고른 뒤 정답을 확인해</div>
+    </div>`;
+}
+
+function pick(kind){
+  choice=kind;
+  document.getElementById('ans').classList.add('show');
+  const btns=document.getElementById('btns');
+  const hint=document.querySelector('.hint');
+  if(kind==='know'){
+    hint.textContent='정답 맞았어?';
+    btns.innerHTML = `
+      <button class="b-right" onclick="grade('known')">맞췄다</button>
+      <button class="b-wrong" onclick="grade('wrong')">틀렸다</button>`;
+  } else {
+    hint.textContent='나중에 다시 보자 🔁';
+    btns.innerHTML = `<button class="b-next" onclick="grade('review')">다음 →</button>`;
+  }
+}
+
+function grade(st){
+  status[items[i].id]=st;
+  i++;
+  render();
+}
+
+async function finish(){
+  document.getElementById('prog').style.width='100%';
+  document.getElementById('counter').textContent=`${items.length} / ${items.length}`;
+  const c=counts();
+  stage.innerHTML = `
+    <div class="done">
+      <h2>🎉 끝! 결과 저장 중…</h2>
+      <div class="scores">
+        <div class="score k"><div class="n">${c.k}</div><div class="l">✅ 맞춤</div></div>
+        <div class="score r"><div class="n">${c.r}</div><div class="l">🔁 다시</div></div>
+        <div class="score w"><div class="n">${c.w}</div><div class="l">❌ 틀림</div></div>
+      </div>
+      <div class="savemsg" id="savemsg">단어장에 표시하는 중...</div>
+    </div>`;
+  try{
+    const res=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({statuses:status})});
+    const j=await res.json();
+    document.getElementById('savemsg').innerHTML = j.ok
+      ? '✅ 단어장 md에 아이콘 표시 완료! 이 창은 닫아도 됨.'
+      : '⚠️ 저장 실패';
+  }catch(e){
+    document.getElementById('savemsg').textContent='⚠️ 저장 실패: '+e;
+  }
+}
+
+function shuffle(a){
+  for(let j=a.length-1;j>0;j--){ const k=Math.floor(Math.random()*(j+1)); [a[j],a[k]]=[a[k],a[j]]; }
+  return a;
+}
+fetch('/api/items').then(r=>r.json()).then(d=>{ items=shuffle(d); render(); });
+</script>
+</body>
+</html>

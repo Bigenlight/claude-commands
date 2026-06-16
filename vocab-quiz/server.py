@@ -25,6 +25,7 @@ def resolve_md(argv):
 
 MD_PATH = resolve_md(sys.argv)
 RESULTS_PATH = os.path.join(HERE, "results.json")
+FEEDBACK_PATH = os.path.join(HERE, "feedback.json")
 PORT = int(os.environ.get("VOCAB_PORT", "8765"))
 
 ICONS = {"known": "✅", "review": "🔁", "wrong": "❌"}
@@ -33,10 +34,10 @@ GRAD = "💯"                      # 연속 3✅ 졸업 표시
 MARK_RE = r"(?:✅|🔁|❌|💯)"     # 아래 줄에 올 수 있는 모든 마크
 MASTER_STREAK = 3  # 연속 ✅ 이만큼이면 졸업(💯 부여 + 출제 제외)
 
-# 블록 + (블록 바로 아래의 아이콘 누적 줄, optional)
+# 블록 + (블록 바로 아래의 아이콘 누적 줄, optional). CRLF 내성 위해 \r?\n.
 BLOCK_MARK_RE = re.compile(
     r"(<details>.*?</details>)"
-    r"((?:\n[ \t]*" + MARK_RE + r"(?:[ \t]+" + MARK_RE + r")*[ \t]*)?)",
+    r"((?:\r?\n[ \t]*" + MARK_RE + r"(?:[ \t]+" + MARK_RE + r")*[ \t]*)?)",
     re.S,
 )
 
@@ -88,6 +89,25 @@ def parse_items(text):
             "history": "".join(icons),
         })
     return items
+
+
+def block_index(text):
+    """id(블록 순번) -> {summary, body, section}. 졸업 여부 무관하게 전체."""
+    out = {}
+    for idx, m in enumerate(BLOCK_MARK_RE.finditer(text)):
+        inner_m = re.search(r"<details>(.*)</details>", m.group(1), re.S)
+        if not inner_m:
+            continue
+        inner = inner_m.group(1)
+        sm = re.search(r"<summary>(.*?)</summary>", inner, re.S)
+        if not sm:
+            continue
+        out[str(idx)] = {
+            "summary": re.sub(r"^\s*" + ICON_RE + r"\s*", "", sm.group(1).strip()),
+            "body": inner[sm.end():].strip(),
+            "section": _section_of(text, m.start()),
+        }
+    return out
 
 
 def apply_icons(statuses):
@@ -168,14 +188,34 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", 0))
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             statuses = payload.get("statuses", {})
+            feedback = payload.get("feedback", {})
             with open(RESULTS_PATH, "w", encoding="utf-8") as f:
                 json.dump(statuses, f, ensure_ascii=False, indent=2)
+            # 피드백을 단어 정보와 함께 기록 (Claude가 나중에 일괄 반영)
+            idx = block_index(read_md())
+            fb_list = []
+            for k, v in feedback.items():
+                v = (v or "").strip()
+                if not v:
+                    continue
+                info = idx.get(str(k), {})
+                fb_list.append({
+                    "id": int(k),
+                    "summary": info.get("summary", ""),
+                    "section": info.get("section", ""),
+                    "body": info.get("body", ""),
+                    "feedback": v,
+                })
+            with open(FEEDBACK_PATH, "w", encoding="utf-8") as f:
+                json.dump(fb_list, f, ensure_ascii=False, indent=2)
             apply_icons(statuses)
             counts = {"known": 0, "review": 0, "wrong": 0}
             for v in statuses.values():
                 if v in counts:
                     counts[v] += 1
-            self._send(200, json.dumps({"ok": True, "counts": counts}, ensure_ascii=False))
+            self._send(200, json.dumps(
+                {"ok": True, "counts": counts, "feedback": len(fb_list)},
+                ensure_ascii=False))
         else:
             self._send(404, "not found", "text/plain")
 

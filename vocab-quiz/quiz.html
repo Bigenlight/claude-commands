@@ -43,6 +43,15 @@
   }
   .answer.show{display:block; animation:fade .3s ease}
   .answer .lbl{font-size:12px; font-weight:700; color:var(--muted); letter-spacing:1px; margin-bottom:6px}
+  .fb{margin-top:16px; padding-top:14px; border-top:1px dashed var(--line)}
+  .fb .fblbl{font-size:12px; font-weight:700; color:#7a6cf0; margin-bottom:7px}
+  .fb textarea{
+    width:100%; min-height:56px; resize:vertical; border:1.5px solid #e6e2fb; border-radius:12px;
+    padding:11px 13px; font-family:inherit; font-size:14px; line-height:1.5; color:#33405a;
+    background:#faf9ff; outline:none; transition:border-color .15s;
+  }
+  .fb textarea:focus{border-color:#9d8bff}
+  .fb textarea::placeholder{color:#b7b0d6}
   @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
   .btns{display:flex; gap:12px; margin-top:22px}
   button{
@@ -83,10 +92,11 @@
 </div>
 
 <script>
-let items = [], i = 0, status = {}, choice = null;
+let items = [], i = 0, status = {}, feedback = {}, choice = null;
 const stage = document.getElementById('stage');
 
 function r(md){ try{ return marked.parse(md); }catch(e){ return md.replace(/\n/g,'<br>'); } }
+function ri(md){ try{ return marked.parseInline(md); }catch(e){ return md; } }
 function counts(){
   let k=0,r=0,w=0;
   for(const v of Object.values(status)){ if(v==='known')k++; else if(v==='review')r++; else if(v==='wrong')w++; }
@@ -110,8 +120,14 @@ function render(){
   stage.innerHTML = `
     <div class="card">
       ${tag}
-      <div class="q">${it.summary}</div>
-      <div class="answer" id="ans"><div class="lbl">정답</div>${r(it.body)}</div>
+      <div class="q">${ri(it.summary)}</div>
+      <div class="answer" id="ans">
+        <div class="lbl">정답</div>${r(it.body)}
+        <div class="fb">
+          <div class="fblbl">✏️ 피드백 (선택) — 예문/설명 개선 요청</div>
+          <textarea id="fb" placeholder="예: 예문이 너무 짧아, 더 구체적인 예시 붙여줘 / 설명이 모호해, 보강해줘"></textarea>
+        </div>
+      </div>
       <div class="btns" id="btns">
         <button class="b-know" onclick="pick('know')">안다</button>
         <button class="b-dont" onclick="pick('dont')">모른다</button>
@@ -137,6 +153,8 @@ function pick(kind){
 }
 
 function grade(st){
+  const fbEl=document.getElementById('fb');
+  if(fbEl){ const v=fbEl.value.trim(); if(v) feedback[items[i].id]=v; }
   status[items[i].id]=st;
   i++;
   render();
@@ -146,6 +164,7 @@ async function finish(){
   document.getElementById('prog').style.width='100%';
   document.getElementById('counter').textContent=`${items.length} / ${items.length}`;
   const c=counts();
+  const fbN=Object.keys(feedback).length;
   stage.innerHTML = `
     <div class="done">
       <h2>🎉 끝! 결과 저장 중…</h2>
@@ -158,11 +177,14 @@ async function finish(){
     </div>`;
   try{
     const res=await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({statuses:status})});
+      body:JSON.stringify({statuses:status, feedback:feedback})});
     const j=await res.json();
-    document.getElementById('savemsg').innerHTML = j.ok
-      ? '✅ 단어장 md에 아이콘 표시 완료! 이 창은 닫아도 됨.'
-      : '⚠️ 저장 실패';
+    let msg = j.ok ? '✅ 단어장 md에 아이콘 표시 완료!' : '⚠️ 저장 실패';
+    if(j.ok && fbN>0){
+      msg += `<br>✏️ 피드백 <b>${fbN}개</b> 저장됨 → 채팅으로 돌아가 "피드백 반영해줘" 라고 하면 Claude가 일괄 반영함.`;
+    }
+    msg += '<br><span style="opacity:.7">이 창은 닫아도 됨.</span>';
+    document.getElementById('savemsg').innerHTML = msg;
   }catch(e){
     document.getElementById('savemsg').textContent='⚠️ 저장 실패: '+e;
   }

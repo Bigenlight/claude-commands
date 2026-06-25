@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: Use this skill when the user asks to generate a weekly review, 주간 리뷰 작성, weekly summary, or /weekly-review. Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation.
-version: 1.2.0
+version: 1.2.1
 argument-hint: (optional) specific week like "2026-W15" — defaults to current week
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent]
 ---
@@ -216,12 +216,12 @@ for i in range(7):
    > **`09-archive/` 는 제외** ← 비활성/다시 볼 확률 낮은 것이라 복습 대상 아님
    > review-due가 03/04에만 있다고 가정하면 안 됨 ← 01/02에도 흩어져 있어서, 과거엔 이 폴더 overdue가 매주 통째로 누락됐었음
 2. 각 파일에서 review-due 날짜와 review-count를 추출
-3. review-count: 3인 것은 제외 (이미 773 완료)
-4. "2026-XX-XX" 같은 placeholder 날짜도 제외
+3. **review-count 값으로 제외하지 말 것** ← count는 상한이 아님. 3은 기본 졸업 지점일 뿐이고, 중요하거나 다시 보고 싶은 노트는 count가 3을 넘을 수도 있음. **review-due 날짜만 보고 판단**할 것 (placeholder가 아닌 실제 날짜가 박혀 있으면 count 값과 무관하게 대상)
+4. "2026-XX-XX" 같은 placeholder 날짜는 제외 (review-due가 비었거나 졸업해서 지운 경우)
 5. **일기 복습도 스캔**: `02-areas/diary-review.md` 파일을 Read해서 "트래커" 표의 각 행을 파싱
    - **헤더행(`| 작성일 | ... |`)과 구분선(`|---|`)은 제외** — 첫 칸(`작성일`)이 `YYYY-MM-DD` 형식인 데이터 행만 처리
    - 각 행에서 `review-due` 날짜와 `count`를 추출 (표 컬럼)
-   - `count`가 3이거나 `review-due`가 `완료`/빈칸/`2026-XX-XX`류 placeholder면 제외 (이미 773 졸업이거나 미설정)
+   - `review-due`가 `완료`/빈칸/`2026-XX-XX`류 placeholder면 제외 (졸업해서 비웠거나 미설정). **`count` 값으로는 제외하지 말 것** ← count 3은 기본 졸업 지점이지 상한이 아님. review-due에 실제 날짜가 남아 있으면 count와 무관하게 대상
    - 일기 행은 파일이 아니라 표의 한 줄이므로, 식별자는 `작성일 + 제목/키워드`로 표기 (Drive 링크라 `[[wikilink]]` 대신 **일반 텍스트**로)
 6. 분류 (지식노트 + 일기 행 모두 동일하게):
    - **기한 지남 (overdue)**: review-due < 오늘

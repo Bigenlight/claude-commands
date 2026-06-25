@@ -1,7 +1,7 @@
 ---
 name: us-stock-advisor
 description: 미국 주식 시장 조사 + 전략 판단 + 리스크 리뷰를 멀티에이전트로 수행하고, 결과를 슬랙 DM으로 전송. 뉴스·매크로·기술적 분석 → 전략 수립 → 리스크 검토 → 검증 → 슬랙 보고 파이프라인. KIS API/실거래 없이 순수 리서치·판단만.
-version: 4.0.0
+version: 4.1.0
 argument-hint: <포트폴리오 정보 — 현금 잔고(USD), 보유 종목(ticker, 수량, 평단가)>
 allowed-tools: [Read, Grep, Glob, Bash, Agent, WebSearch, WebFetch, ToolSearch]
 ---
@@ -20,6 +20,13 @@ No live trading or order execution — pure research and judgment only.
 - Phase 0 same-day continuity check (no more 12-min regime flips)
 - SMALL_PORTFOLIO_MODE with ETF universe
 - News date filter, dual-framing requirement, sentiment cap, opportunity_cost requirement
+
+**v4.1 changes (low-return restructuring P0 fixes)**:
+- Target price is ATR/measured-move based, NOT capped at 60-day resistance — a confirmed uptrend may target a breakout above resistance (fixes the "BUY signal ⇒ R/R collapses to ~1.0" deadlock)
+- Fractional shares allowed; position size is governed by % weight, not share price (a 1-share lot exceeding the cap is no longer an automatic reject)
+- Broad-market index ETFs (SPY, QQQ) are NOT subject to the single-NAME position cap — their cap is `etf_max_position` (TIER_SMALL 70%); they are never trimmed for "over-concentration"
+- TREND_PARTICIPATION: in RISK_ON/NEUTRAL with the benchmark above SMA50>SMA200, a broad-ETF core up to the tier equity floor is the default, and overbought RSI alone is NOT a reject reason
+- Opportunity cost of cash is an explicit, growing cost in uptrends — `NO_VIABLE_ALTERNATIVE` is disallowed unless RISK_OFF
 
 ## Portfolio Input
 $ARGUMENTS
@@ -54,11 +61,16 @@ Parse `$ARGUMENTS` for cash balance (USD) and held positions. Compute `portfolio
 
 Detect `portfolio_value_usd` and select tier:
 
-| Tier | Range (USD) | Max single-trade loss | R/R minimum | Max single position | Mode |
-|------|-------------|-----------------------|-------------|---------------------|------|
-| TIER_SMALL | < $5,000 | 3% of portfolio | 2.0 | 25% | SMALL_PORTFOLIO_MODE (ETF-first) |
-| TIER_MID | $5,000 – $25,000 | 1.5% | 1.8 | 40% | normal |
-| TIER_LARGE | > $25,000 | 1.0% | 1.8 | 60% | normal |
+| Tier | Range (USD) | Max single-trade loss | R/R minimum (single name) | Max single NAME | Max broad-ETF | Equity floor (RISK_ON/NEUTRAL) | Mode |
+|------|-------------|-----------------------|-------------|-----------------|---------------|-------------------------------|------|
+| TIER_SMALL | < $5,000 | 3% of portfolio | 2.0 | 25% | 70% | 60% | SMALL_PORTFOLIO_MODE (broad-ETF core) |
+| TIER_MID | $5,000 – $25,000 | 1.5% | 1.8 | 40% | 80% | 50% | normal |
+| TIER_LARGE | > $25,000 | 1.0% | 1.8 | 60% | 90% | 50% | normal |
+
+- **Max single NAME** applies to individual stocks only. **Max broad-ETF** applies to a total-market or S&P-500/Nasdaq-100 index ETF (SPY, QQQ, VOO, IVV, VTI, DIA, IWM); sector/thematic/commodity ETFs (SOXX/SMH/XLE/GLD) and all single stocks use the single-NAME cap. A broad index is not single-name concentration and is never trimmed for "POSITION_OVER_CAP".
+- **Equity floor**: in RISK_ON or NEUTRAL regimes with the benchmark (QQQ) above SMA50>SMA200, total equity exposure should be AT LEAST this floor — holding cash above `(1 − floor)` in an uptrend is a flagged opportunity-cost decision, not a default. Equity exposure = (value of equity ETFs + single stocks) ÷ portfolio_value_usd; GLD/commodities and cash do not count toward the floor. The floor is a soft default (justify, don't auto-violate), NOT a hard buy mandate.
+- **R/R minimum** binds single-NAME entries. Adding to a broad-ETF core inside TREND_PARTICIPATION (Phase 2) is exempt from the R/R gate.
+- Fractional shares are allowed: size every position by % weight against `portfolio_value_usd`, never reject a candidate solely because one whole share exceeds the cap.
 
 Pass selected tier to all phases. Phase 3 risk review uses tier limits as **MUST-EXIT** (not advisory).
 
@@ -311,17 +323,19 @@ prompt: |
 
 **No LLM call.** Run the Python indicator script after Agents 1-3 finish. Output is JSON to stdout, captured and passed to Phase 2 as `<technical_analysis>`.
 
-**Default ticker list (always)**: `NVDA GOOGL MSFT META AMZN AAPL TSLA AMD TSM INTC MU MRVL AVGO`
+**Default ticker list (always)**: `QQQ NVDA GOOGL MSFT META AMZN AAPL TSLA AMD TSM INTC MU MRVL AVGO`
 
-**SMALL_PORTFOLIO_MODE addition**: if `tier == TIER_SMALL`, prepend ETF universe: `SPY QQQ SOXX XLE GLD SMH`.
+**QQQ is ALWAYS included (all tiers)** as the TREND_PARTICIPATION benchmark — its SMA50/SMA200 are required by Phase 2/3/4 to evaluate the equity floor regardless of tier.
+
+**SMALL_PORTFOLIO_MODE addition**: if `tier == TIER_SMALL`, prepend the rest of the ETF universe: `SPY SOXX XLE GLD SMH`.
 
 **Always append**: `{held_tickers}` (held positions, MANDATORY) and `{watchlist_extras}` (any tickers surfaced by Agents 1-3 with sentiment_score >= +0.5).
 
 ```bash
 # Phase 1 Step 4 — deterministic indicators
-TICKERS="NVDA GOOGL MSFT META AMZN AAPL TSLA AMD TSM INTC MU MRVL AVGO"
-# If TIER_SMALL, prepend ETFs:
-# TICKERS="SPY QQQ SOXX XLE GLD SMH $TICKERS"
+TICKERS="QQQ NVDA GOOGL MSFT META AMZN AAPL TSLA AMD TSM INTC MU MRVL AVGO"  # QQQ always = benchmark
+# If TIER_SMALL, prepend the rest of the ETF universe:
+# TICKERS="SPY SOXX XLE GLD SMH $TICKERS"
 # Append held + watchlist:
 # TICKERS="$TICKERS {held_tickers} {watchlist_extras}"
 
@@ -404,27 +418,66 @@ prompt: |
   5. Defined stop-loss limiting loss to <= tier_max_loss_pct of portfolio
      (TIER_SMALL=3%, TIER_MID=1.5%, TIER_LARGE=1.0%)
 
+  Note: criterion 3 (R/R) binds SINGLE-NAME entries. Adding to a broad-ETF core under
+  TREND_PARTICIPATION is exempt (see Market Regime Rules). Overbought RSI alone is NOT a
+  disqualifier in a confirmed uptrend.
+
+  ## Target Price Methodology (v4.1 — fixes the R/R deadlock)
+  Do NOT cap the target at `resistance_60d`. A BUY signal requires an established uptrend,
+  which puts price near its 60-day high — capping reward at resistance then collapses R/R
+  to ~1.0 and auto-rejects every trending name. Instead:
+  - target_price = entry + max(2.0 × atr_14, measured_move), where
+    measured_move = (resistance_60d − support_60d), projected up from the breakout point
+    (both fields are in the script output). For a confirmed uptrend (price > SMA50 > SMA200,
+    MACD > 0) the target MAY exceed `resistance_60d` — treat a new high as a breakout target,
+    not a ceiling.
+  - risk = entry − stop_loss (stop = nearest of `support_60d`, SMA50, or entry − 1.5 × atr_14).
+  - reward = target − entry. Compute R/R = reward / risk against the tier minimum.
+  - This keeps the price-derivability rule (targets still derived from the script's ATR/SMA/
+    support fields) while removing the resistance ceiling. Document the target basis in
+    `rationale_by_dimension.technical`.
+
   ## Position Sizing (capped by tier)
   - High conviction (news +0.7+, tech BUY 0.7+): up to tier_max_position
   - Medium conviction: 50-70% of tier_max_position
   - Low conviction (strong catalyst only): 25-40% of tier_max_position
-  - Tier max single position: TIER_SMALL=25%, TIER_MID=40%, TIER_LARGE=60%
+  - Tier max single NAME: TIER_SMALL=25%, TIER_MID=40%, TIER_LARGE=60%
+  - Tier max broad-ETF (SPY/QQQ): TIER_SMALL=70%, TIER_MID=80%, TIER_LARGE=90%
   - Max total deployed: 90% (10% cash buffer)
+  - Fractional shares allowed: express size as % of portfolio_value_usd. NEVER reject a
+    candidate because one whole share exceeds the cap — size a fractional position instead.
 
   ## SMALL_PORTFOLIO_MODE (active when tier == TIER_SMALL)
-  - ETFs (SPY, QQQ, SOXX, XLE, GLD, SMH) are PRIMARY candidates.
-  - Single-stock candidates are DEMOTED unless 1-share entry < 25% of portfolio AND
-    R/R >= 2.0 AND sentiment >= +0.6.
-  - Diversification > concentration at this tier.
+  - A broad-market ETF core (QQQ/SPY) is the DEFAULT holding, not a fallback. In RISK_ON/
+    NEUTRAL regimes deploy toward the equity floor (60%) via the broad-ETF core unless RISK_OFF.
+  - Broad ETFs (SPY, QQQ) use the etf_max_position cap (70%), are sized with fractional shares,
+    and are NEVER demoted or trimmed for single-name concentration.
+  - Sector ETFs (SOXX, XLE, GLD, SMH) and single stocks use the single-NAME cap (25%) and the
+    R/R 2.0 gate. Single stocks are DEMOTED unless fractional/1-share entry fits the 25% cap
+    AND R/R >= 2.0 AND sentiment >= +0.6.
+  - Diversification > concentration for single names — but the broad-ETF core IS diversification.
 
   ## Market Regime Rules
-  - RISK_ON: normal rules
-  - RISK_OFF: cut sizes 50%, require confidence >= 0.7.
+  - RISK_ON: normal rules + TREND_PARTICIPATION active
+  - RISK_OFF: cut sizes 50%, require confidence >= 0.7. TREND_PARTICIPATION suspended.
     Exception: catalyst unrelated to macro risk, tech_confidence >= 0.80, R/R >= 1.8 → allow up to 20%
-  - NEUTRAL: standard caution
+  - NEUTRAL: standard caution + TREND_PARTICIPATION active
+
+  ## TREND_PARTICIPATION (v4.1 — active in RISK_ON / NEUTRAL)
+  When market_regime is RISK_ON or NEUTRAL AND the benchmark (QQQ; use script data) is above
+  SMA50 which is above SMA200:
+  - The broad-ETF core (QQQ/SPY) up to the tier equity floor is the BASELINE allocation.
+    If current equity exposure is below the floor, the default action is to BUY the broad-ETF
+    core toward the floor — this is not optional "chasing", it is the regime baseline.
+  - Adding to the broad-ETF core under this rule is EXEMPT from the R/R >= tier_minimum gate
+    and from the "price below resistance" requirement. Overbought RSI alone is NOT a reject reason.
+  - Single-name entries still require the full entry criteria (R/R, catalyst, stop).
+  - The broad-ETF core still uses a risk control: stop = benchmark daily close below SMA50.
+  - Suspended only in RISK_OFF, or if the benchmark breaks below SMA50 (then de-risk per stops).
 
   ## Regime Bias Correction
-  - In RISK_ON: do NOT be excessively conservative. >60% cash + strong catalysts = too conservative.
+  - In RISK_ON/NEUTRAL uptrend: cash above (1 − equity_floor) is an opportunity-cost decision
+    that MUST be justified; >60% cash with the benchmark above SMA50>SMA200 is too conservative.
   - In RISK_OFF: do NOT chase "bargain" dips. <40% cash = too aggressive.
 
   ## Sentiment Integration Rules
@@ -440,8 +493,10 @@ prompt: |
 
   **For every HOLD recommendation you MUST list `opportunity_cost`**: name a specific
   BUY-eligible alternative that was rejected, and state why this HOLD wins. If no
-  alternative is BUY-eligible, set `opportunity_cost: "NO_VIABLE_ALTERNATIVE"` with a
-  one-sentence justification. This prevents lazy HOLDs in active markets.
+  single-name alternative is BUY-eligible, the broad-ETF core (QQQ/SPY) is ALWAYS a viable
+  alternative whenever TREND_PARTICIPATION is active — so `NO_VIABLE_ALTERNATIVE` is
+  DISALLOWED in RISK_ON/NEUTRAL uptrends (use it only in RISK_OFF, with justification).
+  Sitting in cash while the benchmark trends up is itself the rejected alternative you must defend.
 
   ## Prior Run Continuity
   If `<prior_run>` is provided below, you MUST emit `delta_vs_prior_run`:
@@ -572,26 +627,41 @@ prompt: |
 
   Portfolio tier: {TIER_SMALL / TIER_MID / TIER_LARGE}
   Tier max single-trade loss: {3% / 1.5% / 1.0%}
-  Tier R/R minimum: {2.0 / 1.8 / 1.8}
-  Tier max single position: {25% / 40% / 60%}
+  Tier R/R minimum (single name): {2.0 / 1.8 / 1.8}
+  Tier max single NAME: {25% / 40% / 60%}
+  Tier max broad-ETF (SPY/QQQ): {70% / 80% / 90%}
+  Tier equity floor (RISK_ON/NEUTRAL): {60% / 50% / 50%}
+  TREND_PARTICIPATION: broad-ETF core adds toward the equity floor are R/R-exempt in RISK_ON/NEUTRAL uptrends
 
   ## Disciplined Aggression — 7 Principles
   1. Never lose money — capital preservation #1, but calculated risks OK with strong catalysts
-  2. Margin of safety — if price already ran toward target, reject or demand adjustment
+  2. Margin of safety — for SINGLE NAMES, if price already ran toward target, reject or demand
+     adjustment. Does NOT apply to broad-ETF core adds under TREND_PARTICIPATION (a rising
+     benchmark above SMA50>SMA200 is the thesis, not a disqualifier).
   3. Circle of competence — speculative/unverifiable claims → lean reject
-  4. Mr. Market check — no-catalyst momentum chasing → reject
+  4. Mr. Market check — no-catalyst momentum chasing in SINGLE NAMES → reject. Buying the
+     broad-ETF core toward the tier equity floor in a RISK_ON/NEUTRAL uptrend is NOT
+     momentum-chasing — it is the regime baseline; do not reject it on this principle.
   5. Catalyst quality (moat) — prefer dominant companies, skeptical of speculative names
-  6. Patience over activity — marginal trades → reject
+  6. Patience over activity — marginal SINGLE-NAME trades → reject. But inaction toward the
+     equity floor in an uptrend has opportunity cost — do not reward cash-hoarding.
   7. Contrarian lens — everyone piling in → extra scrutiny
 
   ## Hard Rules (binding by tier — NON-NEGOTIABLE)
-  - Max single position: tier_max_position_pct
+  - Max single NAME: tier_max_name_pct (TIER_SMALL 25% / MID 40% / LARGE 60%)
+  - Max broad-ETF (SPY/QQQ): tier_etf_pct (TIER_SMALL 70% / MID 80% / LARGE 90%)
   - Max total deployed: 90% (10% cash buffer)
   - Daily drawdown > -3% → halt all trading
-  - No BUY without stop-loss
-  - No BUY with R/R < tier_minimum
-  - Max single-trade loss: tier_max_loss_pct of portfolio
-  - Catalyst freshness: publication_date_iso within 14 days (30 days for SEC/earnings)
+  - No BUY without stop-loss (broad-ETF core: stop = benchmark daily close below SMA50)
+  - No SINGLE-NAME BUY with R/R < tier_minimum. Broad-ETF core adds under TREND_PARTICIPATION
+    are EXEMPT from the R/R gate (a diversified index in a confirmed uptrend has no fixed
+    resistance target).
+  - Max single-trade loss: tier_max_loss_pct of portfolio (broad-ETF core sized to the SMA50
+    stop, not a tight single-name stop)
+  - Catalyst freshness: publication_date_iso within 14 days (30 days for SEC/earnings).
+    Broad-ETF core under TREND_PARTICIPATION needs no single dated catalyst — the regime IS the catalyst.
+  - Do NOT recommend trimming a broad-market ETF (QQQ/SPY) for single-name "over-concentration";
+    the single-NAME cap does not apply to diversified index ETFs.
 
   ## Portfolio
   <portfolio>
@@ -612,8 +682,9 @@ prompt: |
   ## 8-Point Checklist (per recommendation)
   1. **Capital preservation (TIER-BINDING)**: Calculate (entry - stop) × quantity.
      Is this <= tier_max_loss_pct of portfolio_value_usd? If breach → REJECT (not "adjust").
-  2. **Margin of safety**: Entry-to-target vs entry-to-stop ratio? Has price already moved
-     toward target? R/R must be >= tier_minimum.
+  2. **Margin of safety (SINGLE NAMES only)**: Entry-to-target vs entry-to-stop ratio? Has price
+     already moved toward target? R/R must be >= tier_minimum. Broad-ETF core (SPY/QQQ) adds under
+     TREND_PARTICIPATION are EXEMPT from this item (see Hard Rules) — a rising benchmark is the thesis.
   3. **Catalyst quality & freshness**: Real material catalyst with publication_date_iso
      within 14 days? Or speculative momentum-chasing?
   4. **Circle of competence**: Thesis clear and verifiable?
@@ -647,9 +718,9 @@ prompt: |
         "approved": true,
         "reason": "2-3 sentence justification",
         "risk_score": 0.3,
-        "max_loss_check": "$19.50/share × 3 shares = $58.50 = 4.9% of portfolio — EXCEEDS TIER_LARGE 1% rule → REJECT",
+        "max_loss_check": "(entry − stop) × size = X% of portfolio vs tier_max_loss_pct. If over, REDUCE the % weight (fractional shares allowed) — do NOT reject on whole-share count or force a 1-share floor. Reject only if even a minimal viable weight breaches the cap",
         "tier_rule_breach": false,
-        "adjustments": "Reduce to 1 share to limit max loss to $19.50 (1.6%)",
+        "adjustments": "Trim position % (fractional) so max loss <= tier_max_loss_pct",
         "verification_flags": ["NONE"]
       }
     ],
@@ -681,7 +752,10 @@ prompt: |
   - `traceability_score < 0.7`
   - 3+ `critical_warnings`
   - any `HALLUCINATION_FLAG`
-  - any `HARD_RULE_VIOLATION` (tier 1%/1.5%/3% rule breached, R/R below tier minimum)
+  - any `HARD_RULE_VIOLATION` (tier 1%/1.5%/3% rule breached, single-name R/R below tier minimum)
+  - any BUY claiming R/R-exempt or catalyst-exempt TREND_PARTICIPATION status whose ticker is
+    NOT a broad-market index ETF (per the Phase 0 tier-table definition: SPY/QQQ/VOO/IVV/VTI/DIA/IWM)
+    — a single name smuggled through the broad-ETF-core exemption → HARD_RULE_VIOLATION
   - `regime_flip` within 4 hours without fresh dated catalyst
     (publication_date_iso within 6h of `delta_vs_prior_run` flip)
   - price discrepancy > 2% between the deterministic indicator script and any
@@ -708,6 +782,10 @@ prompt: |
   - Position sizing within TIER limits (not the old static 60%/90%)?
   - Existing position HOLDs include substantive `opportunity_cost`? (Not boilerplate.)
   - Strategy matches market_regime AND tier mode?
+  - TREND_PARTICIPATION honored? In RISK_ON/NEUTRAL with benchmark above SMA50>SMA200, did
+    strategy hold >= tier equity floor or explicitly justify cash above it? 0 equity / >60% cash
+    in a confirmed uptrend without justification → critical_warning. Did it wrongly recommend
+    trimming a broad ETF (QQQ/SPY) for single-name concentration? → critical_warning.
   - Bull/bear adversarial genuine or perfunctory?
   - `delta_vs_prior_run` field present and justified if a flip?
 
@@ -807,7 +885,7 @@ Do not attempt a second re-run; deliver as-is with the warning.
 
 {만약 mode == SMALL_PORTFOLIO_MODE이면:}
 **Small Portfolio Mode 활성화** (포트폴리오 < $5,000)
-사유: ETF 위주 운용으로 리스크 분산을 우선합니다.
+사유: 광역 지수 ETF(QQQ/SPY) 코어를 기본으로 추세에 참여하며 리스크를 분산합니다.
 
 # US Stock Advisor Report — {날짜} ({ET_time} ET / {session})
 
@@ -862,8 +940,8 @@ Do not attempt a second re-run; deliver as-is with the warning.
 5. 가장 주의해야 할 리스크 요인
 
 {만약 mode == SMALL_PORTFOLIO_MODE이면 맨 마지막에 sticky note:}
-> 📌 포트폴리오 < $5k 구간에서는 ETF 위주 운용을 권장합니다.
-> $5k 도달 시 단일 종목 모드로 전환됩니다.
+> 📌 포트폴리오 < $5k 구간에서는 광역 지수 ETF(QQQ/SPY) 코어 중심 운용을 권장합니다.
+> $5k 도달 시 단일 종목 비중을 확대합니다.
 ```
 
 ### Step 2: Slack Delivery
@@ -898,5 +976,8 @@ Output to user: Slack status, recommendation summary, validation result, tier, m
 16. **Phase 3 treats tier limits as MUST-EXIT, not advisory**
 17. **Phase 4 uses HARD GATE rubric — do not default to PASS_WITH_WARNINGS**
 18. **Indicator script (`/home/theo_lab/.claude/skills/us-stock-advisor/scripts/fetch_indicators.py`) is ground truth for prices; agent-quoted prices > 2% off → ignored + flagged**
-19. **TIER_SMALL → SMALL_PORTFOLIO_MODE → ETF universe prepended, ETFs prioritized**
+19. **TIER_SMALL → SMALL_PORTFOLIO_MODE → broad-ETF core (QQQ/SPY) is the default holding; broad ETFs use the 70% ETF cap (not the 25% single-name cap) and are never trimmed for concentration**
 20. **Same-day prior run < 12h ago → injected as `<prior_run>`, regime flips require dated catalyst**
+21. **TREND_PARTICIPATION: in RISK_ON/NEUTRAL with QQQ above SMA50>SMA200, hold >= tier equity floor via the broad-ETF core; core adds are R/R-exempt and overbought RSI alone is not a reject reason**
+22. **Target price is ATR/measured-move based, NOT capped at 60-day resistance; a confirmed uptrend may target a breakout above resistance**
+23. **Fractional shares allowed — size by % of portfolio_value_usd; never reject a candidate solely because one whole share exceeds the cap**

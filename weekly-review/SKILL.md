@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: Use this skill when the user asks to generate a weekly review, 주간 리뷰 작성, weekly summary, or /weekly-review. Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation.
-version: 1.1.0
+version: 1.2.0
 argument-hint: (optional) specific week like "2026-W15" — defaults to current week
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent]
 ---
@@ -208,20 +208,32 @@ for i in range(7):
 다음 주 일요일: {다음 주 SUN 날짜}
 
 작업:
-1. 03-knowledge/ 와 04-literature/ 하위 모든 .md 파일에서 Grep으로 "review-due:" 포함된 파일을 찾아라
+1. 아래 폴더들 하위 모든 .md 파일에서 Grep으로 "review-due:" 포함된 파일을 찾아라:
+   - `03-knowledge/` (영구 노트)
+   - `04-literature/` (논문 노트)
+   - `01-projects/` (프로젝트 노트 — review-due 박아둔 게 있음)
+   - `02-areas/` (영역 노트 — review-due 박아둔 게 있음)
+   > **`09-archive/` 는 제외** ← 비활성/다시 볼 확률 낮은 것이라 복습 대상 아님
+   > review-due가 03/04에만 있다고 가정하면 안 됨 ← 01/02에도 흩어져 있어서, 과거엔 이 폴더 overdue가 매주 통째로 누락됐었음
 2. 각 파일에서 review-due 날짜와 review-count를 추출
 3. review-count: 3인 것은 제외 (이미 773 완료)
 4. "2026-XX-XX" 같은 placeholder 날짜도 제외
-5. 분류:
+5. **일기 복습도 스캔**: `02-areas/diary-review.md` 파일을 Read해서 "트래커" 표의 각 행을 파싱
+   - **헤더행(`| 작성일 | ... |`)과 구분선(`|---|`)은 제외** — 첫 칸(`작성일`)이 `YYYY-MM-DD` 형식인 데이터 행만 처리
+   - 각 행에서 `review-due` 날짜와 `count`를 추출 (표 컬럼)
+   - `count`가 3이거나 `review-due`가 `완료`/빈칸/`2026-XX-XX`류 placeholder면 제외 (이미 773 졸업이거나 미설정)
+   - 일기 행은 파일이 아니라 표의 한 줄이므로, 식별자는 `작성일 + 제목/키워드`로 표기 (Drive 링크라 `[[wikilink]]` 대신 **일반 텍스트**로)
+6. 분류 (지식노트 + 일기 행 모두 동일하게):
    - **기한 지남 (overdue)**: review-due < 오늘
    - **이번 주 내 (due this week)**: 오늘 ≤ review-due ≤ {SUN}
    - **다음 주 (due next week)**: {SUN 다음날} ≤ review-due ≤ {다음 주 SUN}
 
-6. 출력 형식:
+7. 출력 형식:
    ```
    ## 복습 대상
    ### 기한 지남 (N개)
    - [[파일명]] — review-due: YYYY-MM-DD, count: N
+   - 📔 일기 2026-06-09 "성공한 나의 미래…" — review-due: YYYY-MM-DD, count: N
 
    ### 이번 주 (N개)
    - [[파일명]] — review-due: YYYY-MM-DD, count: N
@@ -229,6 +241,7 @@ for i in range(7):
    ### 다음 주 (N개)
    - [[파일명]] — review-due: YYYY-MM-DD, count: N
    ```
+   > 일기 행은 `📔 일기 {작성일} "{제목/키워드}"` 형태로 표기해서 지식노트와 구분
 
 **중요**: 출력 마지막에 반드시 "읽은 파일 목록"을 붙여라:
 ```
@@ -418,6 +431,7 @@ tags:
    - Agent 4 결과 기반
    - overdue + 이번 주 due 노트를 [[wikilink]] 형식으로 나열
    - 다음 주 due 노트도 "다음 주 예정"으로 별도 표시
+   - **일기 복습 행(📔)은 wikilink가 아니라 Agent 4가 준 일반 텍스트(`📔 일기 작성일 "제목"`) 그대로** 나열 ← Drive 링크라 vault 내 노트가 아님
 
 7. **새로 생성한 Permanent Notes**
    - 이번 주 git log에서 03-knowledge/ 에 새로 추가된 파일
@@ -512,7 +526,7 @@ Phase 2가 작성한 파일을 읽고, Phase 1 데이터와 대조하여 검수.
    - 리뷰가 inbox 항목을 "방치/지연"으로 표현하거나 "처리 안 됨" 식의 부정적 뉘앙스로 적었는가? ← 그러면 수정. inbox 누적은 정상 워크플로우임
 
 4. **Review-due 노트 완전성**
-   - Agent 4가 찾은 overdue + 이번 주 due 노트가 모두 "이번 주 복습 대상"에 [[wikilink]]로 나열되었는가?
+   - Agent 4가 찾은 overdue + 이번 주 due 노트가 모두 "이번 주 복습 대상"에 나열되었는가? (vault 노트는 [[wikilink]], 일기 행은 📔 일반 텍스트)
 
 5. **frontmatter 정확성**
    - type: weekly-review

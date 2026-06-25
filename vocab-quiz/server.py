@@ -10,8 +10,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_MD = os.path.abspath(
-    os.path.join(HERE, "..", "00-inbox", "english-vocab-and-concepts.md")
+DEFAULT_MD = os.path.expanduser(
+    "~/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md"
 )
 
 

@@ -17,3 +17,7 @@ Thumbs.db
 # Specific tmp files (광범위 패턴 회피 — 특정 경로만)
 multi-agent-research/REVIEW.md
 multi-agent-research/REVIEW_v2.md
+
+# vocab-quiz 런타임 산출물 (퀴즈 진행상태/피드백 — 코드 아님)
+vocab-quiz/feedback.json
+vocab-quiz/results.json

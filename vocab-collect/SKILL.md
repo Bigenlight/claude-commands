@@ -15,7 +15,7 @@ argument-hint: <문서 경로 또는 URL> [개수] [대상 단어장 경로]
 
 ## 전제
 
-- **대상 단어장**: 기본 `~/For-Neural-Network-Improvement-Private-/00-inbox/english-vocab-and-concepts.md` (인자로 다른 경로 지정 가능)
+- **대상 단어장**: 기본 `~/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md` (인자로 다른 경로 지정 가능)
 - **단어장 포맷**: vocab-quiz와 동일한 `<details>/<summary>` 블록. 두 섹션 헤더 `## 주목할만한 개념` / `## 영어 단어 및 표현` 사용.
 - **단어 블록 양식** (정확히 지킬 것):
 

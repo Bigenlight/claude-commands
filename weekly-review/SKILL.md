@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: Use this skill when the user asks to generate a weekly review, 주간 리뷰 작성, weekly summary, or /weekly-review. Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation.
-version: 1.2.1
+version: 1.3.0
 argument-hint: (optional) specific week like "2026-W15" — defaults to current week
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent]
 ---
@@ -54,6 +54,8 @@ print(f'SUN={sun}')
 print(f'END_DATE={end_date}')
 print(f'FILENAME={year}-W{week:02d}.md')
 print(f'DATE_RANGE={mon} ~ {end_date}')
+print(f'UNTIL={end_date + datetime.timedelta(days=1)}')  # git log --until 용 (END_DATE + 1일)
+print(f'NEXT_SUN={sun + datetime.timedelta(days=7)}')    # Agent 4 다음 주 일요일 용
 
 # Print each day of the week for file searching
 for i in range(7):
@@ -82,7 +84,7 @@ for i in range(7):
 
 작업:
 1. 아래 경로들에서 해당 주의 데일리 노트를 찾아 읽어라 (데일리 노트가 아직 정리 안 돼서 여기저기 흩어져 있을 수 있음):
-   - 05-daily/{YEAR}/{MM}/ 폴더 내 해당 날짜 파일들 (YYYY-MM-DD.md)
+   - 05-daily/{YEAR}/{MM}/ 폴더 내 해당 날짜 파일들 (YYYY-MM-DD.md) ← 주가 월 경계를 걸치면 (예: 06-29 ~ 07-05) 두 달 폴더 모두 확인
    - root 레벨 (vault 최상위)에 있는 YYYY-MM-DD.md 파일들 (아직 이동 안 된 것)
    - 00-inbox/ 에 있는 YYYY-MM-DD.md 파일들 (inbox에 던져둔 경우)
 
@@ -140,7 +142,7 @@ for i in range(7):
 2. 각 파일의 frontmatter에서 date 필드를 확인하거나, 파일명에서 날짜를 추출
 3. 이번 주 범위({MON} ~ {END_DATE})에 해당하는 노트만 선택
 4. 각 미팅 노트에서 추출:
-   - date, type (lab/3D-VLA/value-function 등)
+   - date, type (lab/3D-VLA/learning-to-fail 등)
    - 주요 논의 주제 (heading 기준)
    - action item이나 추후 진행사항
 
@@ -205,7 +207,7 @@ for i in range(7):
 너는 PARAZETTEL vault의 복습 일정을 스캔하는 수집기임.
 
 오늘 날짜: {END_DATE}
-다음 주 일요일: {다음 주 SUN 날짜}
+다음 주 일요일: {NEXT_SUN}
 
 작업:
 1. 아래 폴더들 하위 모든 .md 파일에서 Grep으로 "review-due:" 포함된 파일을 찾아라:
@@ -226,7 +228,7 @@ for i in range(7):
 6. 분류 (지식노트 + 일기 행 모두 동일하게):
    - **기한 지남 (overdue)**: review-due < 오늘
    - **이번 주 내 (due this week)**: 오늘 ≤ review-due ≤ {SUN}
-   - **다음 주 (due next week)**: {SUN 다음날} ≤ review-due ≤ {다음 주 SUN}
+   - **다음 주 (due next week)**: {SUN 다음날} ≤ review-due ≤ {NEXT_SUN}
 
 7. 출력 형식:
    ```
@@ -264,7 +266,7 @@ for i in range(7):
 1. 01-projects/ 와 02-areas/ 하위 모든 .md 파일을 Glob으로 찾아라
 2. git log로 이번 주에 수정된 파일 필터링:
    ```bash
-   git log --since="{MON}" --until="{END_DATE + 1일}" --name-only --pretty=format: -- "01-projects/" "02-areas/"
+   git log --since="{MON}" --until="{UNTIL}" --name-only --pretty=format: -- "01-projects/" "02-areas/"
    ```
 3. 수정된 파일은 내용 요약 (첫 heading + 주요 변경 내용)
 4. 수정 안 된 파일은 목록만 표시
@@ -305,16 +307,16 @@ for i in range(7):
 1. 아래 git 명령들을 실행:
    ```bash
    # 이번 주 커밋 로그
-   git log --since="{MON}" --until="{END_DATE + 1일}" --oneline --stat
+   git log --since="{MON}" --until="{UNTIL}" --oneline --stat
 
    # 커밋 수
-   git log --since="{MON}" --until="{END_DATE + 1일}" --oneline | wc -l
+   git log --since="{MON}" --until="{UNTIL}" --oneline | wc -l
 
    # 추가/수정된 파일 목록
-   git log --since="{MON}" --until="{END_DATE + 1일}" --name-status --pretty=format:
+   git log --since="{MON}" --until="{UNTIL}" --name-status --pretty=format:
 
    # 가장 활발한 폴더 (상위 5개)
-   git log --since="{MON}" --until="{END_DATE + 1일}" --name-only --pretty=format: | sort | uniq -c | sort -rn | head -20
+   git log --since="{MON}" --until="{UNTIL}" --name-only --pretty=format: | sort | uniq -c | sort -rn | head -20
    ```
 
 2. 출력 형식:
@@ -344,7 +346,7 @@ for i in range(7):
 ## Step 2: Phase 2 — 종합 작성 (Opus agent, 1개)
 
 Phase 1의 6개 Agent 결과를 모두 모아서 하나의 Agent에 전달.
-이 Agent는 **model 지정 없이** (기본 opus) 실행.
+이 Agent는 `model: "opus"`를 **명시적으로 지정**해서 실행 ← model 생략 시 opus가 아니라 부모 세션 모델을 상속하므로, opus를 보장하려면 명시 필요.
 
 ### 이전 주 리뷰 확인
 
@@ -413,10 +415,11 @@ tags:
    - 해당 미팅 내용 반영
    - 없으면 "이번 주 활동 없음" 한 줄
 
-3. **Value Function**
-   - 이번 주 Value Function 관련 활동
-   - RL/value function 관련 내용 추출
+3. **Learning to fail**
+   - 이번 주 Learning to fail 관련 활동 (failure recovery, HIL-RL, Gello/로봇 실험 세팅 등)
+   - RL 이론 공부 중 도메인 B 기반 학습(DDPG/TD3 등)도 여기 포함
    - 없으면 "이번 주 활동 없음" 한 줄
+   > 참고: 2026-05-16에 Value function 연구가 취소되고 Learning to fail로 피벗됨 (W20 리뷰 참조). 과거 주(W19 이전) 리뷰를 재생성할 때만 "Value Function" 섹션명 사용
 
 4. **개인 공부 / 수업**
    - PyTorch 공부, 선형대수, 딥러닝 기초, 수업, 세미나, 행정 등
@@ -429,9 +432,11 @@ tags:
 
 6. **이번 주 복습 대상**
    - Agent 4 결과 기반
-   - overdue + 이번 주 due 노트를 [[wikilink]] 형식으로 나열
-   - 다음 주 due 노트도 "다음 주 예정"으로 별도 표시
-   - **일기 복습 행(📔)은 wikilink가 아니라 Agent 4가 준 일반 텍스트(`📔 일기 작성일 "제목"`) 그대로** 나열 ← Drive 링크라 vault 내 노트가 아님
+   - **overdue(기한 지남) + 이번 주 due 노트는 `- [ ]` 체크박스 to-do 항목으로 나열** ← Theo가 리뷰하면서 복습 끝낸 것 하나씩 `- [x]`로 체크하는 용도. 절대 `- ` 일반 bullet로 뽑지 말 것
+     - 형식: `- [ ] [[파일명]] (count N, review-due YYYY-MM-DD)`
+     - overdue와 이번 주 due를 각각 소제목(`### 기한 지남 (N개)`, `### 이번 주 due (N개)`)으로 나눠서 그 아래 체크박스 나열
+   - **다음 주 due 노트는 참고용이라 `- ` 일반 bullet로** 별도 표시 (`### 다음 주 예정 (N개, 참고)`) ← 이번 주 복습 대상 아니니 체크박스 X
+   - **일기 복습 행(📔)도 overdue/이번 주 due면 `- [ ]` 체크박스**로 나열하되, wikilink가 아니라 Agent 4가 준 일반 텍스트(`📔 일기 작성일 "제목"`) 그대로 씀 ← Drive 링크라 vault 내 노트가 아님. (예: `- [ ] 📔 일기 2026-06-29 "..." (count 1, review-due 2026-07-06)`)
 
 7. **새로 생성한 Permanent Notes**
    - 이번 주 git log에서 03-knowledge/ 에 새로 추가된 파일
@@ -446,7 +451,7 @@ tags:
    - **주의 (취소된 task 구분)**: 어떤 `[ ]` 미완료 항목이 **그 다음 날 노트에서 carry-over 안 되고 그냥 사라졌으면**(삭제됐으면), 더 이상 진행 안 하거나 취소된 task일 확률이 가장 높음 ← 이런 항목은 "아쉬운 점"이나 부정적 피드백으로 쓰지 말 것. **여러 날 계속 `[ ]`로 carry-over 되는 것만 진짜 미완료로 취급.** (애매하면 부정 피드백 대신 다음 주 목표 후보로만 가볍게 언급하거나 아예 빼기)
 
 9. **다음 주 목표**
-   - 서브섹션: Domain A (3D VLA) / Domain B (Value Function) / 개인 공부
+   - 서브섹션: Domain A (3D VLA) / Domain B (Learning to fail) / 개인 공부
    - 미완료 To do + 이번 주 흐름 기반으로 현실적 목표 설정
    - 각 2~4개 bullet
 
@@ -475,7 +480,7 @@ tags:
 ## Step 3: Phase 3 — 검수 (Opus agent, 1개)
 
 Phase 2가 작성한 파일을 읽고, Phase 1 데이터와 대조하여 검수.
-이 Agent도 **model 지정 없이** (기본 opus) 실행.
+이 Agent도 `model: "opus"`를 **명시적으로 지정**해서 실행.
 
 ### Validation Agent prompt:
 
@@ -518,15 +523,17 @@ Phase 2가 작성한 파일을 읽고, Phase 1 데이터와 대조하여 검수.
    - 누락된 항목이 있으면 명시 (단, 위 예외에 해당해 사라진 항목은 "누락"이 아님 — 정상 처리)
 
 2. **미팅 반영 여부**
-   - 이번 주 모든 미팅이 해당 섹션(3D VLA/Value Function/개인 공부)에 언급되었는가?
+   - 이번 주 모든 미팅이 해당 섹션(3D VLA/Learning to fail/개인 공부)에 언급되었는가?
    - 미팅이 없었다면 그 사실이 명시되었는가?
 
 3. **Inbox 수 정확성**
    - Agent 3이 보고한 inbox 파일 수와 리뷰의 "이번 주 Inbox 누적 현황" 수가 일치하는가?
    - 리뷰가 inbox 항목을 "방치/지연"으로 표현하거나 "처리 안 됨" 식의 부정적 뉘앙스로 적었는가? ← 그러면 수정. inbox 누적은 정상 워크플로우임
 
-4. **Review-due 노트 완전성**
+4. **Review-due 노트 완전성 + 체크박스 형식**
    - Agent 4가 찾은 overdue + 이번 주 due 노트가 모두 "이번 주 복습 대상"에 나열되었는가? (vault 노트는 [[wikilink]], 일기 행은 📔 일반 텍스트)
+   - **overdue + 이번 주 due 항목이 `- [ ]` 빈 체크박스 형식으로 나열됐는가?** ← Theo가 복습하며 체크하는 용도라 필수. 만약 `- ` 일반 bullet로 뽑혔으면 `- [ ]`로 고칠 것
+   - **다음 주 예정(참고) 항목은 반대로 `- [ ]`가 아니라 `- ` 일반 bullet이어야 함** ← 이번 주 복습 대상이 아니므로. 체크박스로 돼 있으면 일반 bullet로 고칠 것
 
 5. **frontmatter 정확성**
    - type: weekly-review

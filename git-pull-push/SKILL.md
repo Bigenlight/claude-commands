@@ -27,7 +27,8 @@ allowed-tools: [Bash, Read, Edit, Agent]
 
 ### 4. Push
 - `git push`
-- 실패 시 → 3번으로 돌아가서 반복
+- 리모트가 앞서 있어서 거부되면 → 3번으로 돌아가서 반복 (**최대 3회**)
+- 3회 넘게 실패하거나 충돌 외 원인(인증, upstream 미설정 등)이면 반복하지 말고 원인 보고 후 중단
 
 ### 5. 완료 보고
 - 최종 상태 한 줄로 요약
@@ -42,13 +43,16 @@ allowed-tools: [Bash, Read, Edit, Agent]
 1. **두 내용 공존** — 충돌하는 두 버전이 서로 다른 내용이면 둘 다 살림
 2. **나중 것 우선** — 공존이 어려운 경우(같은 라인을 다르게 수정 등) rebase 기준으로 나중에 생긴 것(내 로컬 커밋) 채택
 
+> rebase 중엔 marker 방향이 merge와 반대임 — `<<<<<<< HEAD` 쪽이 **리모트**, `=======` 아래(`>>>>>>>` 쪽)가 **내 로컬 커밋**. 헷갈리지 말 것.
+
 ### 충돌 해결 절차
 1. 충돌 파일 Read로 읽어서 conflict marker 확인
 2. 각 충돌 블록을 Opus 에이전트에 넘겨서 해결 텍스트 생성
 3. Edit 툴로 conflict marker 제거 및 해결 내용 적용
 4. `git add <해결된 파일>`
-5. `git rebase --continue`
+5. `GIT_EDITOR=true git rebase --continue` ← 에디터가 열리면 non-interactive 환경에서 멈추니까 반드시 `GIT_EDITOR=true` 붙일 것
 6. 추가 충돌 있으면 반복 (최대 5 에이전트까지 병렬 활용)
+7. 해결이 불가능하다고 판단되면 (바이너리 충돌 등) `git rebase --abort`로 원상복구 후 상황 보고하고 중단 ← 리포를 rebase 중간 상태로 방치하지 말 것
 
 ### Opus 에이전트 프롬프트 형식
 충돌 블록을 넘길 때 아래 형식으로:

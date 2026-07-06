@@ -1,6 +1,6 @@
 # Claude Code Skills (Theo's personal collection)
 
-Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 10개 스킬 전부 활성화.
+Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 11개 스킬 전부 활성화.
 
 > **2026-05-04 마이그레이션**: 기존 `~/claude-commands/skills/<name>/` → `~/.claude/skills/<name>/` 평탄 구조로 변경. 자세한 내용은 하단 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -18,6 +18,7 @@ Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토
 | [`/multi-agent-research`](#multi-agent-research) | Manual | Survey/compare/verify 5+ papers·docs·repos and produce a single consolidated markdown report — Sonnet × N parallel extraction + Opus audit + Opus consolidation pipeline |
 | [`/paper-digest`](#paper-digest) | Manual | 최근 Scholar-Inbox 스크린샷에서 추천받은 논문들을 자동으로 검색·다운로드·요약·이미지 추출해 ~/For-Neural-Network-Improvement-Private- git repo에 날짜별 md로 정리하는 스킬. 사용자가 "/paper-digest", "오늘 받은 논문 정리해줘", "scholar inbox 정리" 같은 발화로 트리거. |
 | [`/vocab-collect`](#vocab-collect) | Manual | 문서(PDF·md·txt·URL)에서 Theo 수준 영어 단어를 멀티에이전트로 추출·선정해 기존 단어장과 비교 후 새 단어만 양식대로 추가. vocab-quiz와 단어장 공유 |
+| [`/vocab-quiz`](#vocab-quiz) | Manual | `<details>/<summary>` 포맷 단어장을 로컬 웹 퀴즈로 풀고 결과를 md에 아이콘으로 누적 마킹. vocab-collect와 단어장 공유 |
 
 ---
 
@@ -31,7 +32,7 @@ git clone git@github.com:Bigenlight/claude-commands.git ~/.claude/skills
 git clone https://github.com/Bigenlight/claude-commands.git ~/.claude/skills
 ```
 
-Restart Claude Code — 10개 스킬 전부 자동 활성화.
+Restart Claude Code — 11개 스킬 전부 자동 활성화.
 
 > 이미 `~/.claude/skills/` 디렉토리가 있으면 먼저 백업하거나 비워야 함. swap 절차는 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -203,6 +204,20 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 ```
 
 **파이프라인**: 문서 길이 측정 → 개수 자동 결정(짧음~5 / 보통~10 / 긺~12–15) → 기존 단어장 summary로 중복 제외 → Sonnet × N 추출 → Opus × 3 관점별 선정 → Opus × 1 종합 + vocab/concept 자동 분류 → 섹션 끝에 양식대로 append. 입력은 로컬 파일 + 웹 URL 모두 지원. 아이콘 줄은 안 붙이고(아직 안 푼 단어), 블록은 섹션 끝에만 추가해 vocab-quiz의 id/마킹이 안 깨지게 함.
+
+---
+
+## vocab-quiz
+
+`<details>/<summary>` 포맷의 영어 단어/개념 단어장 md를 로컬 웹 퀴즈 사이트로 띄우고, 푼 결과를 md 파일에 아이콘(✅🔁❌💯)으로 누적 마킹. `vocab-collect`와 **같은 단어장 파일을 공유**한다. 마킹(결정론적)은 서버가, 피드백 반영(LLM)은 스킬이 분리 처리.
+
+```
+/vocab-quiz <단어장.md 경로>
+"단어 시험"
+"단어장 퀴즈"
+```
+
+**동작**: `server.py`가 로컬 포트(기본 8765)로 퀴즈 웹앱 서빙 → 브라우저에서 풀기 → 정오답이 단어장 블록 아래 아이콘 줄로 누적. 단어장 경로는 인자 > `VOCAB_MD` env > 기본 후보경로 순으로 해석. 773 복습(3회 졸업 💯)과 연동.
 
 ---
 

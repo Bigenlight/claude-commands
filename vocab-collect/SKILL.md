@@ -15,7 +15,7 @@ argument-hint: <문서 경로 또는 URL> [개수] [대상 단어장 경로]
 
 ## 전제
 
-- **대상 단어장**: 기본 `~/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md` (인자로 다른 경로 지정 가능)
+- **대상 단어장** (우선순위: ① 인자로 준 경로 → ② 환경변수 `VOCAB_MD` → ③ 후보 기본경로): vocab-quiz `server.py`와 **동일한 `VOCAB_MD` env 컨벤션 공유**. PC별로 `export VOCAB_MD=...` 한 번 세팅해두면 두 스킬이 같은 단어장을 가리킴. env도 없으면 후보 경로를 순서대로 탐색 — `~/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md` → `~/OneDrive/Desktop/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md` → 현재 워크스페이스(리포 루트)의 `02-areas/english-vocab-and-concepts.md`.
 - **단어장 포맷**: vocab-quiz와 동일한 `<details>/<summary>` 블록. 두 섹션 헤더 `## 주목할만한 개념` / `## 영어 단어 및 표현` 사용.
 - **단어 블록 양식** (정확히 지킬 것):
 
@@ -50,7 +50,7 @@ argument-hint: <문서 경로 또는 URL> [개수] [대상 단어장 경로]
 
 ### 1. 문서 확보 & 길이 측정 → 개수 결정
 
-- **URL이면**: arxiv abs/pdf URL은 PDF로 다운로드(`curl -L`), 일반 페이지는 `WebFetch`로 본문 확보. 임시 경로(`/tmp/`)에 저장.
+- **URL이면**: arxiv abs/pdf URL은 PDF로 다운로드(`curl -L`), 일반 페이지는 `WebFetch`로 본문 확보. 임시 경로(세션 scratchpad 디렉토리, 없으면 `/tmp/`)에 저장.
 - **PDF면**: 페이지 수 측정 — `pdfinfo X.pdf | grep -i pages` 또는 `python3 -c "import pypdf; print(len(pypdf.PdfReader('X.pdf').pages))"`.
 - **텍스트(md/txt/웹)면**: 단어 수 측정 — `wc -w`.
 - **개수 스케일** (사용자가 명시 안 했을 때):
@@ -70,12 +70,14 @@ grep -oP '(?<=<summary>).*?(?=</summary>)' "<단어장경로>" | sed 's/<[^>]*>/
 
 ### 3. 읽기 분담 결정
 
-- **PDF**: 리더 수 = `min(5, ceil(페이지/10))`. 페이지를 균등 분할(에이전트당 ≤ 20p — Read `pages` 한계). 예: 48p → 5명 × 약 10p.
+- **PDF**: 리더 수 = `min(5, ceil(페이지/10))`. 페이지를 균등 분할(에이전트당 ≤ 20p — Read `pages` 한계). 예: 48p → 5명 × 약 10p. 100p 초과 문서라 에이전트당 20p를 넘게 되면, 한 에이전트가 Read를 여러 번(호출당 ≤ 20p) 나눠 읽도록 지시.
 - **텍스트/웹**: 본문을 균등 청크로 분할(리더 수 = min(5, ceil(단어/2000))). 각 청크 텍스트를 에이전트 프롬프트에 직접 넣거나, 파일 offset 범위를 지정.
 
 ### 4. Workflow 실행 (Sonnet 추출 → Opus 선정 → Opus 종합·자동분류)
 
 아래 템플릿을 문서 타입/분할에 맞게 채워 `Workflow`로 실행한다. (스킬이 Workflow 호출을 지시하므로 opt-in 충족)
+
+> Workflow 툴이 환경에 없으면 같은 파이프라인을 **Agent 툴 병렬 호출**로 대체 실행 (Sonnet 리더 N명 병렬 → Opus 선정 3명 병렬 → Opus 종합 1명, 각 단계 결과를 다음 단계 프롬프트에 전달).
 
 - **Read 단계 (Sonnet ×N)**: 각자 맡은 범위에서 후보 단어 + 논문 속 등장 문장(그대로 인용) + 페이지 + 뜻 + 난이도 + 중요 이유를 뽑음. EXCLUDE/너무 쉬운 단어 제외.
 - **Select 단계 (Opus ×3)**: 서로 다른 관점(① 문서 이해 핵심 ② 범용 학술 어휘 ③ 난이도 높고 가치 큰)으로 각자 후보 풀에서 선정안 작성.
@@ -166,7 +168,7 @@ return final
 ## 주의
 
 - **대상 단어장은 직접 수정**(섹션 끝에 블록 append)됨. git 추적 파일이면 추가 후 커밋 권장.
-- vocab-quiz가 **블록 순서로 id를 매기므로**, 새 블록은 항상 **섹션 끝에 추가**(중간 삽입 금지)해야 기존 마킹/feedback id가 안 깨짐.
+- vocab-quiz가 **블록 순서로 id를 매기므로**, 새 블록은 항상 **섹션 끝에 추가**(중간 삽입 금지). 단 `## 주목할만한 개념` 끝에 추가하면 그 뒤 `## 영어 단어 및 표현` 섹션 블록들의 순번은 밀림 → **미반영 `feedback.json`이 남아있으면 먼저 피드백 반영(또는 비우기) 후 collect 실행할 것.** (마킹 아이콘은 블록 바로 아래 붙어있어서 순번과 무관하게 안전)
 - 중복 방지: 반드시 step 2의 EXCLUDE를 거쳐 같은 단어 재추가 방지. 표기만 다른 동의 표현도 종합 단계에서 거를 것.
 - 분류 애매한 단어(개념 vs 일반어 경계)는 종합 에이전트 판단에 맡기되, 결과 보고 시 어느 섹션에 넣었는지 표로 명시.
 - 문서를 못 읽거나(스캔 PDF 등 텍스트 추출 실패) 후보가 빈약하면, 무리해서 채우지 말고 사용자에게 알릴 것.

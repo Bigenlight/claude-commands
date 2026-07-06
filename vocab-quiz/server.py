@@ -10,8 +10,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_MD = os.path.expanduser(
-    "~/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md"
+# 리포 위치가 PC마다 다름 → 존재하는 후보를 순서대로 탐색 (다 없으면 첫 후보)
+_DEFAULT_CANDIDATES = [
+    "~/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md",
+    "~/OneDrive/Desktop/For-Neural-Network-Improvement-Private-/02-areas/english-vocab-and-concepts.md",
+]
+DEFAULT_MD = next(
+    (p for p in (os.path.expanduser(c) for c in _DEFAULT_CANDIDATES) if os.path.exists(p)),
+    os.path.expanduser(_DEFAULT_CANDIDATES[0]),
 )
 
 

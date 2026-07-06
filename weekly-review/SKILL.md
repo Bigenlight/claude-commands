@@ -1,7 +1,7 @@
 ---
 name: weekly-review
 description: Use this skill when the user asks to generate a weekly review, 주간 리뷰 작성, weekly summary, or /weekly-review. Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation.
-version: 1.3.0
+version: 1.3.1
 argument-hint: (optional) specific week like "2026-W15" — defaults to current week
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent]
 ---
@@ -403,6 +403,8 @@ tags:
 ```
 
 ### 섹션 구성 (이 순서대로 작성)
+
+> **연구 도메인은 CLAUDE.md에서 동적으로 읽는다 (하드코딩 금지).** 아래 섹션 2·3과 섹션 9의 Domain A/B 이름은 프로젝트 CLAUDE.md 「사용자 프로필」에 명시된 **현재 연구 도메인**을 그대로 쓸 것. 연구보조가 바뀌면 이 스킬을 수정하지 말고 CLAUDE.md 기준으로 자동 반영됨. **작성 기준일 현재: Domain A = 3D VLA, Domain B = Learning to fail** (이 예시가 CLAUDE.md와 어긋나면 CLAUDE.md가 우선). 과거 주(W19 이전 등) 재생성 시엔 그 시점의 도메인명 사용.
 
 1. **이번 주 요약**
    - 3~6개 bullet point로 핵심만

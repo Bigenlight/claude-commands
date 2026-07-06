@@ -1,7 +1,7 @@
 ---
 name: orchestrate
-description: Use this skill when the user asks to orchestrate a complex task, coordinate multiple agents, run a multi-agent workflow, use parallel agents, delegate work to sub-agents, or needs a structured multi-phase pipeline (plan → code → test → review). Provides a complete multi-agent orchestration system with complexity-based model selection (sonnet for workers, fable for top-level judgment/strategy gates) and execution modes (STANDARD, TEAM_OF_TEAMS, MAP_REDUCE, HIERARCHICAL).
-version: 1.1.0
+description: Use this skill when the user asks to orchestrate a complex task, coordinate multiple agents, run a multi-agent workflow, use parallel agents, delegate work to sub-agents, or needs a structured multi-phase pipeline (plan → code → test → review). Provides a complete multi-agent orchestration system with complexity-based model selection (sonnet for workers, fable for top-level judgment/strategy gates) and execution modes (STANDARD, TEAM_OF_TEAMS, MAP_REDUCE, HIERARCHICAL, SPECULATIVE).
+version: 1.1.2
 argument-hint: <task description>
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent]
 ---
@@ -60,7 +60,7 @@ Reason: [one sentence justifying both choices]
 
 ## Common Infrastructure (applies to TEAM_OF_TEAMS, MAP_REDUCE, HIERARCHICAL, SPECULATIVE)
 
-These patterns are shared across all non-STANDARD modes. STANDARD mode does NOT use these.
+These patterns are shared across all non-STANDARD modes. STANDARD mode does NOT use these. SPECULATIVE uses only Context Compression — no checkpoints, and file ownership only applies at the apply-winner step (S-Phase 4), since implementers write specs, not files.
 
 ### File Ownership Mapping
 
@@ -88,6 +88,7 @@ Content: { "agent": "...", "status": "...", "files_completed": [...], "errors": 
 
 - Checkpoints are only required for TEAM_OF_TEAMS, MAP_REDUCE, and HIERARCHICAL modes.
 - STANDARD and SPECULATIVE modes do not need checkpoints.
+- On Windows (or wherever `/tmp` is unreliable), substitute the session scratchpad directory — resolve the absolute path yourself and pass it verbatim into each worker prompt in place of `/tmp/checkpoints/`.
 
 ### Context Compression
 
@@ -244,6 +245,8 @@ prompt:
   ### ISSUES FOUND
   - [issue 1 with file path and line if possible]
 ```
+
+> **Non-code tasks** (note reorganization/classification, doc rewrites, data cleanup — no executable source touched): the Tester runs as a **content-consistency verifier** instead of a code tester. Swap instructions 4/6 (bug/edge-case hunt, automated tests) for: verify the output matches the task spec, check internal consistency (no contradictions, no broken links/references/paths), confirm nothing outside the requested scope was altered, and confirm formatting/convention compliance (frontmatter, naming, structure). "Automated Tests" section becomes "Consistency Checks". Everything else (Regression Check = "did unrelated content get damaged", OVERALL, ISSUES FOUND) stays as-is. Same applies to MAP_REDUCE workers and STANDARD.
 
 ---
 
@@ -965,7 +968,8 @@ Run STANDARD Phase 4, 5, and 6 on the applied changes.
 1. **Assess complexity AND mode first**: Always complete Step 0 and state both level and mode before spawning any agent.
 2. **Declare mode explicitly**: Always begin with `"Mode: [MODE], Complexity: [LEVEL]"` before any work.
 3. **Pass full context**: Never summarize or truncate previous agent outputs when passing to next agents. Insert verbatim.
-4. **Parallel = efficiency**: When the plan identifies independent work, spawn agents simultaneously.
+4. **Parallel = efficiency**: When the plan identifies independent work, spawn agents simultaneously (multiple Agent calls in one message).
+4b. **Sequential gates run synchronously**: Single-agent phases (Planner, Tester, Reviewer, Verifier, Reporter, Judge, Reducer, CEO, Framer) must use `run_in_background: false` — their output is required before the next phase. Only parallel groups (Coders, Team Leads, Map Workers, Sub-Orchestrators, Implementers) may run in background.
 5. **Fable gates are non-negotiable**: Reviewer, Verifier, Judge, Integration Reviewer, CEO, Reducer, Strategic Planner, and Design Framer MUST use `model: "fable"` (the top judgment/strategy tier). Never downgrade these roles to Sonnet or Opus.
 6. **Adaptive Planner**: LOW/MEDIUM → Sonnet Planner. HIGH/CRITICAL → Fable Planner. When in doubt, go one level up.
 7. **LOW task shortcut**: If complexity is LOW, Tester phase may be skipped. Jump directly to Reviewer after Coder.

@@ -3,7 +3,7 @@ name: us-stock-advisor
 description: 미국 주식 시장 조사 + 전략 판단 + 리스크 리뷰를 멀티에이전트로 수행하고, 결과를 슬랙 DM으로 전송. 뉴스·매크로·기술적 분석 → 전략 수립 → 리스크 검토 → 검증 → 슬랙 보고 파이프라인. KIS API/실거래 없이 순수 리서치·판단만.
 version: 4.1.0
 argument-hint: <포트폴리오 정보 — 현금 잔고(USD), 보유 종목(ticker, 수량, 평단가)>
-allowed-tools: [Read, Grep, Glob, Bash, Agent, WebSearch, WebFetch, ToolSearch]
+allowed-tools: [Read, Write, Grep, Glob, Bash, Agent, WebSearch, WebFetch, ToolSearch]
 ---
 
 # US Stock AI Advisor v4 — Research & Judgment Pipeline
@@ -76,7 +76,7 @@ Pass selected tier to all phases. Phase 3 risk review uses tier limits as **MUST
 
 ### Step 5: Same-Day Continuity Check
 
-After timezone detection, scan `/home/theo_lab/securities_company/reports/advisor/` for files matching today's KST date. If found AND last modified < 12 hours ago:
+After timezone detection, scan `~/.claude/us-stock-advisor/reports/` for files matching today's KST date (Phase 5 Step 3 saves every run's report there). If found AND last modified < 12 hours ago:
 
 - Load the most recent file's "최종 결론" section
 - Inject as `<prior_run>` block into Phase 2 Strategy prompt
@@ -91,7 +91,7 @@ If no prior run found: proceed normally with `delta_vs_prior_run = "FIRST_RUN_TO
 ```bash
 # Continuity check (run after timezone step)
 TODAY_KST=$(date '+%Y-%m-%d')
-PRIOR_DIR="/home/theo_lab/securities_company/reports/advisor"
+PRIOR_DIR="$HOME/.claude/us-stock-advisor/reports"
 if [ -d "$PRIOR_DIR" ]; then
   find "$PRIOR_DIR" -maxdepth 2 -type f -name "*${TODAY_KST}*" -mmin -720 -print
 fi
@@ -102,6 +102,8 @@ fi
 ## Phase 1: Parallel Research (3 sonnet agents + 1 deterministic script, ALL ENGLISH)
 
 Launch Agents 1-3 **simultaneously**. Run the Phase 1 indicator script (Step 4) **after** Agents 1-3 finish (so the script can include any tickers surfaced by news flow if needed).
+
+**Placeholder fill rule**: when instantiating the prompts below, fill `{month_year}` with the current ET month + year (e.g. "July 2026") and `{latest_quarter}` with the most recent earnings reporting quarter (e.g. "Q2 2026") — same convention as `{ET_date}` / `{session}`. Never leave stale literal dates in the queries.
 
 ### Agent 1: Tech & Growth Stock News
 
@@ -127,14 +129,14 @@ prompt: |
   Use WebSearch to find the most market-moving news from the last 24 hours (US Eastern).
   You MUST search in English. Perform at least 7 searches using these SPECIFIC query templates:
 
-  1. "NVDA NVIDIA earnings revenue guidance Q1 2026 analyst reaction"
-  2. "semiconductor AI chip export controls China tariff April 2026"
+  1. "NVDA NVIDIA earnings revenue guidance {latest_quarter} analyst reaction"
+  2. "semiconductor AI chip export controls China tariff {month_year}"
   3. "MSFT GOOGL META cloud AI capex spending data center 2026"
-  4. "{held_ticker} {company_name} latest news analyst upgrade downgrade April 2026"
-  5. "defense Pentagon contract award Lockheed RTX Palantir April 2026"
-  6. "Tesla TSLA deliveries autonomous FSD robotaxi April 2026"
+  4. "{held_ticker} {company_name} latest news analyst upgrade downgrade {month_year}"
+  5. "defense Pentagon contract award Lockheed RTX Palantir {month_year}"
+  6. "Tesla TSLA deliveries autonomous FSD robotaxi {month_year}"
   7. "big tech antitrust regulation DOJ FTC Apple Google 2026"
-  8. "INTC MU MRVL AVGO memory semiconductor cycle April 2026"
+  8. "INTC MU MRVL AVGO memory semiconductor cycle {month_year}"
 
   Social sentiment searches (use cashtags on X):
   9. "$NVDA OR $TSLA stocktwits sentiment today"
@@ -219,11 +221,11 @@ prompt: |
   ## Search Instructions
   Use WebSearch in English. Perform at least 6 searches using these SPECIFIC templates:
 
-  1. "copper futures price today LME COMEX April 2026"
-  2. "WTI crude oil price Brent today OPEC production April 2026"
-  3. "EIA weekly crude oil inventory report latest April 2026"
-  4. "steel HRC price Section 232 tariff April 2026"
-  5. "FCX Freeport Grasberg OR XOM Chevron earnings Q1 2026"
+  1. "copper futures price today LME COMEX {month_year}"
+  2. "WTI crude oil price Brent today OPEC production {month_year}"
+  3. "EIA weekly crude oil inventory report latest {month_year}"
+  4. "steel HRC price Section 232 tariff {month_year}"
+  5. "FCX Freeport Grasberg OR XOM Chevron earnings {latest_quarter}"
   6. "lithium carbonate price ALB Albemarle MP Materials 2026"
 
   Social sentiment:
@@ -263,15 +265,15 @@ prompt: |
   ## Search Instructions
   Use WebSearch in English. Perform at least 7 searches using these SPECIFIC templates:
 
-  1. "Federal Reserve FOMC rate decision statement April 2026"
-  2. "US CPI inflation latest data release April 2026"
-  3. "VIX index level today April 2026"
-  4. "10-year Treasury yield today April 2026"
-  5. "S&P 500 futures Nasdaq futures pre-market today April 2026"
-  6. "China manufacturing PMI latest April 2026"
-  7. "geopolitical risk Middle East Taiwan sanctions conflict April 2026"
-  8. "US tariffs trade policy China Europe latest April 2026"
-  9. "DXY dollar index gold price today April 2026"
+  1. "Federal Reserve FOMC rate decision statement {month_year}"
+  2. "US CPI inflation latest data release {month_year}"
+  3. "VIX index level today {month_year}"
+  4. "10-year Treasury yield today {month_year}"
+  5. "S&P 500 futures Nasdaq futures pre-market today {month_year}"
+  6. "China manufacturing PMI latest {month_year}"
+  7. "geopolitical risk Middle East Taiwan sanctions conflict {month_year}"
+  8. "US tariffs trade policy China Europe latest {month_year}"
+  9. "DXY dollar index gold price today {month_year}"
 
   ## Constraints
   - Do NOT state any economic data point (CPI, GDP, jobs, rate decisions) unless you found
@@ -339,35 +341,45 @@ TICKERS="QQQ NVDA GOOGL MSFT META AMZN AAPL TSLA AMD TSM INTC MU MRVL AVGO"  # Q
 # Append held + watchlist:
 # TICKERS="$TICKERS {held_tickers} {watchlist_extras}"
 
-python3 /home/theo_lab/.claude/skills/us-stock-advisor/scripts/fetch_indicators.py $TICKERS
+PY=$(command -v python3 || command -v python)  # Windows Git Bash has `python`, not `python3`
+"$PY" "$HOME/.claude/skills/us-stock-advisor/scripts/fetch_indicators.py" $TICKERS
 RC=$?
 ```
 
-**Script output schema (JSON to stdout)**:
+**Script output schema (JSON to stdout — `tickers` is an object keyed by symbol; date/age/completeness fields are PER-TICKER)**:
 ```json
 {
-  "as_of_close_date": "2026-04-22",
-  "data_age_hours": 18.5,
-  "data_complete": true,
-  "warnings": [],
-  "tickers": [
-    {
-      "ticker": "NVDA",
+  "as_of_run_iso": "2026-04-23T13:30:00+00:00",
+  "tickers": {
+    "NVDA": {
       "current_price": 198.50,
+      "prev_close": 195.20,
+      "day_change_pct": 1.69,
+      "as_of_close_date": "2026-04-22",
+      "data_age_hours": 18.5,
       "rsi_14": 49.08,
+      "macd_line": 3.10,
+      "macd_signal_line": 0.29,
       "macd_histogram": 2.81,
       "sma_20": 176.93,
       "sma_50": 179.67,
       "sma_200": 179.04,
+      "ema_20": 177.50,
       "atr_14": 5.42,
       "support_60d": 179.00,
       "resistance_60d": 211.00,
       "relative_volume": 1.3,
+      "above_sma_50": true,
+      "above_sma_200": true,
       "signal": "BUY",
       "signal_confidence": 0.72,
-      "signal_reasons": ["Price > SMA50", "MACD positive", "RSI mid-range"]
+      "signal_reasons": ["price > SMA50", "MACD histogram positive"],
+      "warnings": [],
+      "data_complete": true
     }
-  ]
+  },
+  "errors": [{"ticker": "XYZ", "reason": "no data returned from yfinance"}],
+  "summary": {"total_requested": 14, "succeeded": 13, "failed": 1, "stalest_data_hours": 18.5}
 }
 ```
 
@@ -377,7 +389,7 @@ RC=$?
 |------|---------|--------|
 | 0 | Success | Capture JSON, proceed to Phase 2 |
 | 1 | Partial success (some tickers failed) | Proceed but flag failed tickers in Phase 2 prompt |
-| 2 | yfinance not installed | **Halt pipeline.** Print to user: `yfinance가 설치되지 않았습니다. 한 번만 실행하세요:\npython3 -m pip install --user --break-system-packages yfinance pandas`. Do NOT fall back to WebSearch. |
+| 2 | yfinance not installed | **Halt pipeline.** Print to user: `yfinance가 설치되지 않았습니다. 한 번만 실행하세요:\n"$PY" -m pip install --user --break-system-packages yfinance pandas` (같은 인터프리터로 설치). Do NOT fall back to WebSearch. |
 | 3 | Full failure (network, all tickers) | **Halt pipeline** with explicit error to user. |
 
 **After Phase 1**: Collect Agents 1-3 JSON + script JSON. If any agent JSON parse fails, pass raw text. Bundle all four into the Phase 2 `<external_data>` block.
@@ -762,9 +774,10 @@ prompt: |
     Phase 1/2 agent's quoted price
   - `delta_vs_prior_run == "REGIME_FLIP_UNJUSTIFIED"`
 
-  Verdict = **PASS_WITH_WARNINGS** if 1-2 non-critical warnings only.
+  Verdict = **PASS_WITH_WARNINGS** if no FAIL gate triggered but there are 1-2 warnings
+  of any kind (1-2 critical_warnings included — a critical warning NEVER yields plain PASS).
 
-  Verdict = **PASS** otherwise (genuinely clean).
+  Verdict = **PASS** only if genuinely clean (zero critical_warnings, no gate near-misses).
 
   ## Audit Checklist
 
@@ -772,7 +785,7 @@ prompt: |
   - News from last 14 days (per publication_date_iso)? Stale = critical_warning.
   - Primary US sources used (Reuters, CNBC, Bloomberg, WSJ)?
   - Sufficient tickers covered, including INTC/MU/MRVL/AVGO universe additions?
-  - Indicator script ran successfully (data_complete: true, data_age_hours < 24)?
+  - Indicator script ran successfully (per-ticker `data_complete: true`, `summary.stalest_data_hours` < 24, no held ticker in `errors[]`)?
 
   ### 2. Strategy Logic
   - Rationale claims align with Phase 1 data (with publication_date_iso)?
@@ -951,8 +964,12 @@ Split if > 4000 chars:
 - Message 1: (FAIL warning if applicable) + Overview + Macro + News + Portfolio + Recommendations
 - Message 2: Quality Check + 최종 결론 + (SMALL_PORTFOLIO sticky note if applicable)
 
-### Step 3: Completion
-Output to user: Slack status, recommendation summary, validation result, tier, mode.
+### Step 3: Save Report (feeds next run's continuity check)
+
+Write the full Korean report to `~/.claude/us-stock-advisor/reports/advisor-{YYYY-MM-DD}_{HHMM}-KST.md` (KST date/time; `mkdir -p` the directory first). Phase 0 Step 5 reads this directory on the next same-day run. This directory is OUTSIDE the `~/.claude/skills` git repo on purpose — generated reports must not be committed by skill-publish.
+
+### Step 4: Completion
+Output to user: Slack status, saved report path, recommendation summary, validation result, tier, mode.
 
 ---
 
@@ -975,9 +992,9 @@ Output to user: Slack status, recommendation summary, validation result, tier, m
 15. **Phase 2 MUST include bull/bear adversarial AND opportunity_cost for every recommendation (BUY or HOLD)**
 16. **Phase 3 treats tier limits as MUST-EXIT, not advisory**
 17. **Phase 4 uses HARD GATE rubric — do not default to PASS_WITH_WARNINGS**
-18. **Indicator script (`/home/theo_lab/.claude/skills/us-stock-advisor/scripts/fetch_indicators.py`) is ground truth for prices; agent-quoted prices > 2% off → ignored + flagged**
+18. **Indicator script (`~/.claude/skills/us-stock-advisor/scripts/fetch_indicators.py`) is ground truth for prices; agent-quoted prices > 2% off → ignored + flagged**
 19. **TIER_SMALL → SMALL_PORTFOLIO_MODE → broad-ETF core (QQQ/SPY) is the default holding; broad ETFs use the 70% ETF cap (not the 25% single-name cap) and are never trimmed for concentration**
-20. **Same-day prior run < 12h ago → injected as `<prior_run>`, regime flips require dated catalyst**
+20. **Every run saves its Korean report to `~/.claude/us-stock-advisor/reports/` (Phase 5 Step 3); same-day prior run < 12h ago → injected as `<prior_run>`, regime flips require dated catalyst**
 21. **TREND_PARTICIPATION: in RISK_ON/NEUTRAL with QQQ above SMA50>SMA200, hold >= tier equity floor via the broad-ETF core; core adds are R/R-exempt and overbought RSI alone is not a reject reason**
 22. **Target price is ATR/measured-move based, NOT capped at 60-day resistance; a confirmed uptrend may target a breakout above resistance**
 23. **Fractional shares allowed — size by % of portfolio_value_usd; never reject a candidate solely because one whole share exceeds the cap**

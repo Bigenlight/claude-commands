@@ -1,7 +1,7 @@
 ---
 name: paper-digest
 description: 최근 Scholar-Inbox 스크린샷에서 추천받은 논문들을 자동으로 검색·다운로드·요약·이미지 추출해 ~/For-Neural-Network-Improvement-Private- git repo에 날짜별 md로 정리하는 스킬. 사용자가 "/paper-digest", "오늘 받은 논문 정리해줘", "scholar inbox 정리" 같은 발화로 트리거.
-tools: Bash, Read, Write, Edit, Glob, Grep, Skill
+allowed-tools: [Bash, Read, Write, Edit, Glob, Grep, Skill, Agent]
 ---
 
 # paper-digest
@@ -30,12 +30,19 @@ Scholar-Inbox 스크린샷 → arxiv 검색 → PDF 다운로드 → 한국어 �
 
 이 단계는 **다른 어떤 작업보다 먼저** 수행한다. (`$DIGEST_DIR`는 메인 Claude가 절대값으로 치환)
 
+> PC마다 clone 위치가 다를 수 있으므로 **후보 경로를 순서대로 탐색**한다 (예: Windows 노트북은 OneDrive Desktop 아래에 있음).
+
 ```bash
-DIGEST_DIR="$HOME/For-Neural-Network-Improvement-Private-"
-if [ ! -d "$DIGEST_DIR" ]; then
-  echo "[FAIL] $DIGEST_DIR 디렉토리가 없습니다."
+for cand in \
+  "$HOME/For-Neural-Network-Improvement-Private-" \
+  "$HOME/OneDrive/Desktop/For-Neural-Network-Improvement-Private-" \
+  "$HOME/Desktop/For-Neural-Network-Improvement-Private-"; do
+  if [ -d "$cand" ]; then DIGEST_DIR="$cand"; break; fi
+done
+if [ -z "$DIGEST_DIR" ]; then
+  echo "[FAIL] For-Neural-Network-Improvement-Private- 디렉토리를 찾을 수 없습니다."
   echo "       먼저 해당 디렉토리를 만들고 git init 또는 git clone 하세요."
-  echo "       예) git clone <repo-url> \"$DIGEST_DIR\""
+  echo "       예) git clone <repo-url> \"\$HOME/For-Neural-Network-Improvement-Private-\""
   exit 1
 fi
 echo "$DIGEST_DIR"   # 메인 Claude가 이 값을 읽어 컨텍스트에 기억
@@ -57,13 +64,21 @@ git repo가 아니면 마찬가지로 즉시 종료. (v1의 WARN을 ERROR로 격
 
 ### 0-3. 나머지 변수 및 점검
 
-- `SHOTS_DIR=$HOME/Pictures/Screenshots`
+- `SHOTS_DIR` — PC마다 다르므로 후보 순서대로 탐색해 **존재하는 첫 경로** 사용:
+  1. `$HOME/Pictures/Screenshots`
+  2. `$HOME/OneDrive/Pictures/Screenshots`
+  3. `$HOME/OneDrive/사진/Screenshots 1` (Windows 한국어 로케일 + OneDrive)
+  4. `$HOME/OneDrive/사진/Screenshots`
+  - 전부 없으면 사용자에게 스크린샷 폴더 경로를 물어볼 것 (자동 생성 금지)
 - `DL_DIR=$HOME/Downloads`
 - 필수 CLI: `curl`, `pdftoppm`, `pdfinfo` — 누락 시 exit 1
+- 선택 CLI: `convert`, `identify` (imagemagick) — 누락 시 단계 B.5 crop만 skip하고 페이지 원본 사용 (중단 금지)
 - `TODAY=$(date +%Y-%m-%d)`
 - `OUT_MD=$DIGEST_DIR/paper-digest-${TODAY}.md`
 - `IMG_BASE=$DIGEST_DIR/paper-digest-images`
 - 동일 날짜 `OUT_MD` 존재 시 `.bak` 백업 후 덮어쓰기 여부 사용자 확인
+
+> **의도된 설계 — 리뷰 시 지적 금지.** 출력을 vault 규칙(`08-assets/YYYY/` + `<img width=600>`)이 아니라 **리포 루트**에 두고 `![]()` 마크다운 이미지 문법을 쓰는 건 일부러임. digest와 이미지는 **한 번 훑고 인사이트로 만든 뒤 삭제**하는 임시 산출물이라 vault의 영구 자산 컨벤션을 따르지 않음. (자동 리뷰가 이걸 "vault 규칙 위반"으로 재지적하지 않도록 명시해 둠)
 
 각 변수는 정의 직후 `echo`로 한 번 출력하여 메인 Claude가 그 출력을 읽고 컨텍스트에 기억해 두어야 한다. 이후 Phase 1~5의 Bash 호출에서는 이 절대값을 직접 명령어에 박아 넣는다.
 
@@ -94,7 +109,7 @@ echo "IMG_BASE=$IMG_BASE"
 
 ### Sub-agent 페르소나 (프롬프트 최상단에 그대로 주입)
 
-> 너는 **AI 로보틱스 분야 대학원생**이다. 독자도 동일 수준 — DL과 로보틱스의 기초 상식(SGD, transformer block, IL, RL, VLA, diffusion 등)을 이미 어느 정도 동료다. 그 수준에서 자명한 용어는 풀이 없이 **영어 원문 그대로** 쓰고, 그보다 한 단계 위의 특수 개념만 짧게 한 줄 풀이한다.
+> 너는 **AI 로보틱스 분야 대학원생**이다. 독자도 동일 수준 — DL과 로보틱스의 기초 상식(SGD, transformer block, IL, RL, VLA, diffusion 등)을 이미 어느 정도 갖춘 동료다. 그 수준에서 자명한 용어는 풀이 없이 **영어 원문 그대로** 쓰고, 그보다 한 단계 위의 특수 개념만 짧게 한 줄 풀이한다.
 
 ### Sub-agent 작업 단계
 
@@ -594,8 +609,9 @@ grep -oE '\./paper-digest-images/[^)]+\.png' "$OUT_MD" | sort -u | while read re
   count=$(echo "$matches" | grep -c .)
   if [ "$count" -eq 1 ]; then
     new=$(basename "$matches")
-    # markdown에서 자동 치환
-    sed -i "s|key_[0-9]\+_${word}\.png|${new}|g" "$OUT_MD"
+    # markdown에서 자동 치환 — 반드시 $dir(slug 폴더)까지 포함해 매칭할 것.
+    # (파일명만 매칭하면 다른 논문의 같은 word(key_N_results.png 등) 참조까지 오염됨)
+    sed -i "s|${dir}/key_[0-9]\+_${word}\.png|${dir}/${new}|g" "$OUT_MD"
     echo "[FIXED] $rel → $dir/$new"
   elif [ "$count" -eq 0 ]; then
     echo "[MISSING] $rel — 일치 파일 없음. 사용자 확인 필요"

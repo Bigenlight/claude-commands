@@ -35,12 +35,13 @@ description: 영어 단어/개념 단어장(markdown)을 로컬 웹 퀴즈로 �
 ## 실행 방법
 
 1. 대상 단어장 md 경로를 확인한다 (사용자가 안 주면 물어본다).
-2. 포트 비었는지 확인: `ss -ltn | grep ':8765 '` (쓰는 중이면 `VOCAB_PORT` 환경변수로 변경)
+2. 포트 비었는지 확인: `ss -ltn | grep ':8765 '` — Windows(Git Bash)는 `netstat -ano | grep ':8765'` (쓰는 중이면 `VOCAB_PORT` 환경변수로 변경)
 3. 백그라운드로 서버 실행:
    ```bash
    python3 ~/.claude/skills/vocab-quiz/server.py "<단어장.md 절대경로>"
    ```
    (경로 생략 시 `VOCAB_MD` env → 그것도 없으면 스킬의 기본 경로)
+   > **Windows 주의**: `python3`이 MS Store 스텁이라 실행이 안 될 수 있음 → `python`으로 실행할 것. (migrate 명령도 동일)
 4. `curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8765/` 로 200 확인
 5. 사용자에게 **http://localhost:8765** 안내. 다 풀면 결과가 md에 자동 저장됨.
 
@@ -70,7 +71,7 @@ description: 영어 단어/개념 단어장(markdown)을 로컬 웹 퀴즈로 �
   python3 ~/.claude/skills/vocab-quiz/server.py migrate "<단어장.md 절대경로>"
   ```
   멱등하므로 여러 번 돌려도 안전.
-- **서버 종료**: `kill -9 $(ss -ltnp | grep ':8765 ' | grep -oP 'pid=\K[0-9]+')`
+- **서버 종료**: `kill -9 $(ss -ltnp | grep ':8765 ' | grep -oP 'pid=\K[0-9]+')` — Windows(Git Bash)는 `netstat -ano | grep ':8765'`로 PID 확인 후 `taskkill //PID <pid> //F`
 - 마킹 규칙은 `server.py`의 `ICONS`, `MASTER_STREAK`, `apply_icons()` 참고.
 
 ## 주의

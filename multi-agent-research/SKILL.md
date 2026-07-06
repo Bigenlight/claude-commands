@@ -1,7 +1,7 @@
 ---
 name: multi-agent-research
 description: Use this skill when the user gives multiple information sources (papers, docs, repos, sites — typically 5+) and asks to survey, compare, extract structured facts, or verify claims across them, producing a single consolidated markdown report as the deliverable. Differs from `orchestrate` in that the work is reading + synthesis, not coding. Differs from `review`/`security-review` in that multiple sources are compared. Examples — "이 10개 논문 다 읽고 X 평가 방식 정리해줘", "compare these 8 frameworks on Y", "여기 리포 5개랑 spec 1개 있어, 다 분석해서 표로 정리해서 md로 줘". Skip for ≤4 sources (single Agent call is enough), pure code review (use `review`/`security-review`), bulk file *transformation* (use `orchestrate` MAP_REDUCE), or chat-style explainer questions.
-version: 1.0.0
+version: 1.0.1
 argument-hint: <topic and what facts to extract across sources>
 allowed-tools: [Read, Glob, Grep, Bash, Write, Edit, Agent, WebFetch, WebSearch]
 ---
@@ -64,7 +64,7 @@ The lens is **mutable**. If the user adds a fact mid-pipeline ("also check X"), 
 
 ## Step 2 — Folder convention (set up first via `mkdir -p`)
 
-Use a working dir, never write to orchestrator context. ID prefixes are sortable so `ls` reflects pipeline order:
+Use a working dir, never write to orchestrator context. Choosing `<working_dir>`: user-specified path if given; otherwise create `<topic-slug>-survey/` under CWD. If CWD is a git repo (e.g., the notes vault), do not commit `repos/` — cloned repos are disposable reference copies. ID prefixes are sortable so `ls` reflects pipeline order:
 
 ```
 <working_dir>/
@@ -72,7 +72,7 @@ Use a working dir, never write to orchestrator context. ID prefixes are sortable
     00-canonical-<short>.md      # Phase B (Opus deep-dive of official sources)
     10-source-<id>-<short>.md    # Phase C (Sonnet per-source extraction)
     20-repo-<short>.md           # Phase D (Sonnet repo clone+inspect)
-    30-audit-<axis>.md           # Phase E (Opus audit)
+    30-audit-<name>.md           # Phase E (Opus audits: divergences, consistency, completeness)
     _progress.md                 # source × fact matrix (orchestrator state)
   repos/                         # Phase D: cloned reference repositories
     <short_name>/
@@ -89,7 +89,7 @@ After the run completes, **leave the working dir intact** — the user typically
 
 This is the single source of truth for "what's been extracted from where". After each subagent returns, update one row.
 
-Format (initialize at end of Phase A, update after every Phase C / D / F):
+Format (initialize at end of Phase A, update after every Phase C / D / F return; after Phase E, update the `relevance` column from the completeness auditor's classification):
 
 ```markdown
 | source       | type   | relevance | method | training_data | compute | results | code_url | repo_inspected |
@@ -113,7 +113,7 @@ Use this matrix to:
 
 ### Phase A — Identification (orchestrator-local, no agents)
 
-Read just enough of each source to identify it (PDF page 1, repo README, site landing page, etc.). Build a brief table: short name, type, **relevance** (`canonical` / `high` / `medium` / `low` / `n.a.`).
+Read just enough of each source to identify it (PDF page 1, repo README, site landing page, etc.). Build a brief table: short name, type, **relevance** (`canonical` / `high` / `medium` / `low` / `n/a`).
 
 **Detect off-topic early** — abstract may *mention* topic X without *evaluating on* X. If unsure, mark `medium` and let Phase C confirm.
 
@@ -124,7 +124,7 @@ Initialize `findings/_progress.md`. Show the user the table; confirm/skip any so
 For each source classified `canonical`, dispatch **one Opus** in parallel. These reports are the reference axis everything else compares against. Skip this phase if no canonical source.
 
 **Concurrency primitive** (applies to Phases B, C, D, E):
-> Send all parallel Agent calls in **one assistant message** as separate tool calls. The runtime executes them concurrently and returns the batch as a single set of results; the next assistant turn fires only after all results are in. This is the local convention used by `orchestrate` and `weekly-review` — match it. Do not use `run_in_background` flags on Agent calls; if needed at all, that pattern is reserved for genuinely independent long-running work outside this pipeline.
+> Send all parallel Agent calls in **one assistant message** as separate tool calls — the runtime executes them concurrently. This is the local convention used by `orchestrate` and `weekly-review` — match it. Phases are synchronization barriers: do NOT start the next phase until **every** agent of the current batch has returned. If the harness runs agents in the background by default, either pass `run_in_background: false` on each call in the batch, or wait for all completion notifications before proceeding — never dispatch the next phase off partial results.
 
 ### Phase C — Per-source extraction (Sonnet, parallel ≤10, inline-multi-call)
 
@@ -139,11 +139,11 @@ After Phase C reports return, harvest all repo/dataset URLs from `findings/10-so
 **Pre-clone dedup**:
 1. Deduplicate URLs across sources.
 2. Check `repos/` and the user's CWD — if a working copy already exists, skip cloning (especially relevant when the user pre-cloned a key repo).
-3. Skip 404/private URLs after a quick `gh repo search` or `git ls-remote --quiet`.
+3. Skip 404/private URLs after a quick `gh repo view <owner>/<repo>` or `git ls-remote --quiet`.
 
 For surviving URLs: `git clone --depth 1` into `repos/<short>/`, then have a Sonnet locate the eval/training/main entry points and write `findings/20-repo-<short>.md`. Critically — compare paper claim vs repo content and flag discrepancies (e.g., "paper says code released" but repo only has README, or `eval = TODO`).
 
-Use the prompt template in §6.
+(No separate §6 template for this phase — the brief above is the prompt spec; reuse the citation format from §6.1.)
 
 ### Phase E — Opus audit (parallel 2)
 
@@ -239,7 +239,7 @@ prompt: |
   - Code/path: <relative path>:L<line>
   - Web: <URL> "<≤10-word quote>"
 
-  Compare to canonical protocol (briefly): <one-line summary of what the canonical source dictates, e.g. "official protocol: 50 rollouts/task, 65 atomic + 300 composite tasks, PandaOmron, 224×224 RGB×3"> — note any deviations EXPLICITLY.
+  Compare to canonical protocol (briefly): <one-line summary of what the canonical source dictates, e.g. "official protocol: 50 rollouts/task, 65 atomic + 300 composite tasks, PandaOmron, 224×224 RGB×3"> — note any deviations EXPLICITLY. (Orchestrator: omit this block if there is no canonical source / Phase B was skipped.)
 
   Write findings to: <working_dir>/findings/10-source-<id>-<short>.md
   Use markdown with tables where helpful. Cite extensively.
@@ -267,15 +267,9 @@ prompt: |
      | source A | source B | metric | benchmark | value A | value B | likely cause |
      Include every pair of sources that report numerically different values for the same baseline+benchmark, regardless of how small the gap. Hypothesize the cause from extracted setup details (demos count, learning rate, task subset, robot embodiment, image resolution).
 
-  2. Classify each source by relevance to the lens topic:
-     - `eval-on-topic` (actually evaluates/measures the topic)
-     - `cites-only` (mentions but does not evaluate)
-     - `off-topic` (irrelevant)
-     Add a column to _progress.md if not present.
+  2. Flag suspicious extractions: any claim that contradicts the canonical source by an order of magnitude, any "n/a" that should be filled, any baseline number that contradicts ≥2 other sources.
 
-  3. Flag suspicious extractions: any claim that contradicts the canonical source by an order of magnitude, any "n/a" that should be filled, any baseline number that contradicts ≥2 other sources.
-
-  4. List re-extraction recommendations as: `<source> needs <fact>` — only if the missing fact has high impact on the final report.
+  3. List re-extraction recommendations as: `<source> needs <fact>` — only if the missing fact has high impact on the final report.
 
   Output: write <working_dir>/findings/30-audit-consistency.md (markdown, with tables). Return a ≤300-word summary listing top 3-5 issues + the re-run list.
 ```
@@ -298,10 +292,17 @@ prompt: |
 
   For each fact column with ≥30% empty cells: identify whether the gap is real (fact not in those sources) or a Sonnet under-extraction (fact is in source but agent missed it).
 
+  Classify each source by relevance to the lens topic:
+  - `eval-on-topic` (actually evaluates/measures the topic)
+  - `cites-only` (mentions but does not evaluate)
+  - `off-topic` (irrelevant)
+  Do NOT edit _progress.md yourself — include the classification list in your output file and summary; the orchestrator updates the relevance column.
+
   Output: <working_dir>/findings/30-audit-completeness.md with:
   - A coverage matrix (axis × % filled)
   - A re-run shortlist: specific source × specific fact, with reason
   - A "likely-not-extractable" list (facts truly absent from sources, save Phase G time)
+  - The per-source relevance classification list
 
   Return a ≤300-word summary + the re-run shortlist.
 ```

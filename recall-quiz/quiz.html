@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>recall-quiz — 노트 복습</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#1d2127; --sub:#5b6472; --line:#e4e7ec;
+    --accent:#6d6af5; --accent-soft:#eceafe;
+    --ans-bg:#f2f7f4; --ans-line:#bfe0cd; --ans-ink:#1f3d2c;
+    --warn:#c9791f; --warn-soft:#fbf1e3; --danger:#d1495b;
+    --chat-bg:#eef1f7; --chat-line:#d3d9e6;
+    --shadow:0 10px 40px rgba(20,25,40,.10);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12141a; --card:#1b1e26; --ink:#e9ecf2; --sub:#9aa3b2; --line:#2b2f3a;
+      --accent:#8f8cff; --accent-soft:#26243f;
+      --ans-bg:#16241c; --ans-line:#2f5b3f; --ans-ink:#bfe6cd;
+      --warn:#e0a458; --warn-soft:#2c2313; --danger:#e26d7d;
+      --chat-bg:#20242e; --chat-line:#333a49;
+      --shadow:0 10px 40px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"]{ color-scheme:dark; }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:26px 16px 70px; line-height:1.6;
+  }
+  .wrap{width:100%; max-width:760px}
+  header{margin-bottom:14px}
+  .titlerow{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+  h1{font-size:19px; margin:0; letter-spacing:-.01em}
+  .mode-badge{font-size:12px; font-weight:700; padding:3px 10px; border-radius:99px; background:var(--accent-soft); color:var(--accent)}
+  .note-path{color:var(--sub); font-size:12px; margin-top:3px; word-break:break-all}
+  .bar{height:7px; background:var(--line); border-radius:99px; overflow:hidden; margin:14px 0 5px}
+  .bar>i{display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .35s cubic-bezier(.4,0,.2,1)}
+  .count{font-size:12.5px; color:var(--sub); text-align:right}
+
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    box-shadow:var(--shadow); padding:26px 24px; margin-top:12px;
+    display:flex; flex-direction:column;
+  }
+  .metarow{display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px; align-items:center}
+  .chip{font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:99px; background:var(--accent-soft); color:var(--accent)}
+  .chip.d{background:transparent; border:1px solid var(--line); color:var(--sub); font-weight:500}
+  .chip.retry{background:var(--warn-soft); color:var(--warn)}
+  .chip.leech{background:var(--warn-soft); color:var(--warn); font-weight:700}
+  .q{font-size:19px; font-weight:650; letter-spacing:-.01em; margin:0}
+  .qhint{color:var(--sub); font-size:14px; margin:10px 0 0}
+  .heading-ref{color:var(--sub); font-size:12px; margin-top:10px; font-style:italic}
+
+  .answer{
+    margin-top:18px; padding:16px 18px; border-radius:14px;
+    background:var(--ans-bg); border:1px solid var(--ans-line); color:var(--ans-ink);
+    font-size:15px; animation:pop .28s ease; overflow-x:auto;
+  }
+  .answer .lab{font-weight:800; font-size:11px; letter-spacing:.06em; opacity:.8; display:block; margin-bottom:8px}
+  .answer p:first-of-type{margin-top:0} .answer p:last-child{margin-bottom:0}
+  @keyframes pop{from{opacity:0; transform:translateY(6px)}to{opacity:1; transform:none}}
+
+  .controls{display:flex; gap:9px; margin-top:22px; flex-wrap:wrap}
+  button{
+    font:inherit; cursor:pointer; border-radius:11px; border:1px solid var(--line);
+    padding:11px 16px; background:var(--card); color:var(--ink); font-weight:600;
+    transition:transform .07s, background .15s, border-color .15s, color .15s;
+  }
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.45; cursor:default}
+  .reveal{flex:1; background:var(--accent); color:#fff; border-color:var(--accent); font-size:15px}
+  .reveal:hover{filter:brightness(1.05)}
+  .grade{flex:1; min-width:96px}
+  .g-dunno:hover:not(:disabled){border-color:var(--danger); color:var(--danger)}
+  .g-dunno.on{background:var(--danger); color:#fff; border-color:var(--danger)}
+  .g-meh:hover:not(:disabled){border-color:var(--warn); color:var(--warn)}
+  .g-know:hover:not(:disabled){border-color:var(--accent); color:var(--accent)}
+  .star{min-width:96px}
+  .star:hover:not(:disabled){border-color:var(--warn); color:var(--warn)}
+  .star.on{background:var(--warn); color:#fff; border-color:var(--warn)}
+
+  .interact{margin-top:16px; border-top:1px dashed var(--line); padding-top:14px}
+  .interact textarea{
+    width:100%; min-height:52px; resize:vertical; font:inherit; font-size:14px;
+    border:1px solid var(--line); border-radius:11px; padding:10px 12px;
+    background:var(--bg); color:var(--ink);
+  }
+  .interact textarea:focus{outline:none; border-color:var(--accent)}
+  .irow{display:flex; gap:8px; margin-top:9px; flex-wrap:wrap}
+  .ibtn{font-size:13px; padding:8px 13px; font-weight:600}
+  .ibtn.preset:hover:not(:disabled){border-color:var(--accent); color:var(--accent)}
+  .chatlog{margin-top:14px; display:flex; flex-direction:column; gap:10px}
+  .bubble{padding:12px 14px; border-radius:12px; font-size:14.5px; overflow-x:auto}
+  .bubble.user{background:transparent; border:1px solid var(--line); color:var(--sub); align-self:flex-end; max-width:85%}
+  .bubble.tutor{background:var(--chat-bg); border:1px solid var(--chat-line)}
+  .bubble .who{font-size:11px; font-weight:700; opacity:.7; display:block; margin-bottom:5px}
+  .spinner{display:inline-block; width:15px; height:15px; border:2px solid var(--chat-line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; margin-right:7px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .err{color:var(--danger); font-size:13px; margin-top:8px}
+
+  .done{text-align:center; padding:14px 8px}
+  .done h2{font-size:22px; margin:8px 0 4px}
+  .done .tally{display:flex; justify-content:center; gap:18px; margin:18px 0; flex-wrap:wrap}
+  .tally .t{display:flex; flex-direction:column; align-items:center; gap:2px}
+  .tally .n{font-size:26px; font-weight:800}
+  .tally .l{font-size:12px; color:var(--sub)}
+  .marklist{text-align:left; max-width:560px; margin:14px auto 0; font-size:14px}
+  .marklist h3{font-size:14px; margin:16px 0 6px}
+  .marklist li{margin:3px 0}
+  .khint{text-align:center; color:var(--sub); font-size:12px; margin-top:18px}
+  kbd{background:var(--line); border-radius:5px; padding:1px 6px; font-size:11px; font-family:inherit}
+  .fatal{background:var(--card); border:1px solid var(--danger); border-radius:14px; padding:20px; color:var(--danger)}
+  code{font-family:"SF Mono",ui-monospace,Menlo,Consolas,monospace; background:rgba(125,125,125,.15); padding:1px 5px; border-radius:5px; font-size:.9em}
+  pre{overflow-x:auto; background:rgba(125,125,125,.10); padding:12px; border-radius:10px}
+  pre code{background:none; padding:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="titlerow">
+      <h1>🧠 노트 복습</h1>
+      <span class="mode-badge" id="modeBadge">—</span>
+    </div>
+    <div class="note-path" id="notePath"></div>
+    <div class="bar"><i id="prog"></i></div>
+    <div class="count" id="count"></div>
+  </header>
+  <div id="stage"></div>
+  <div class="khint">인출(retrieval)이 핵심 — 답 보기 전에 <b>먼저 머릿속으로</b> 떠올려봐. <kbd>Space</kbd> 답 보기</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<script>
+// ---------- theme sync (viewer toggle stamps data-theme) ----------
+// ---------- markdown + math render ----------
+function mdRender(el, text){
+  text = text || "";
+  try{
+    el.innerHTML = (window.marked ? marked.parse(text) : escapeHtml(text).replace(/\n/g,"<br>"));
+  }catch(e){ el.innerHTML = escapeHtml(text).replace(/\n/g,"<br>"); }
+  if(window.renderMathInElement){
+    try{
+      renderMathInElement(el, {
+        delimiters:[
+          {left:"$$",right:"$$",display:true},
+          {left:"$",right:"$",display:false},
+          {left:"\\[",right:"\\]",display:true},
+          {left:"\\(",right:"\\)",display:false},
+        ],
+        throwOnError:false
+      });
+    }catch(e){}
+  }
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+async function api(path, body){
+  const r = await fetch(path, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)});
+  return r.json();
+}
+
+// ---------- state ----------
+let manifest=null, queue=[], pos=0, revealed=false;
+const settled=new Set();          // qid 확정(애매/안다/leech)
+const gradeCount={known:0, meh:0, dunno:0};
+const missCount={};               // qid -> 연속 모르겠다
+const repeatMarked=new Map();     // qid -> heading (repeat on)
+const starMarked=new Map();       // qid -> heading (star on)
+const stage=document.getElementById("stage");
+const prog=document.getElementById("prog");
+const count=document.getElementById("count");
+
+function totalQ(){ return manifest.questions.length; }
+function curCard(){ return queue[pos]; }
+
+async function boot(){
+  let data;
+  try{
+    const r=await fetch("/api/questions"); data=await r.json();
+  }catch(e){ return fatal("서버에서 문제를 못 불러옴: "+e); }
+  if(!data || !Array.isArray(data.questions) || !data.questions.length){
+    return fatal("questions.json에 문제가 없음. 생성 파이프라인을 먼저 실행해줘. "+(data&&data.error?("("+data.error+")"):""));
+  }
+  manifest=data;
+  queue=data.questions.map(q=>({...q, _retry:0}));
+  document.getElementById("modeBadge").textContent=data.mode||"quiz";
+  document.getElementById("notePath").textContent=data.source_note||"";
+  render();
+}
+function fatal(msg){ stage.innerHTML=`<div class="fatal">⚠️ ${escapeHtml(msg)}</div>`; }
+
+function updateProgress(){
+  prog.style.width=(settled.size/totalQ()*100)+"%";
+  count.textContent=`${settled.size} / ${totalQ()} 완료`;
+}
+
+function render(){
+  updateProgress();
+  const q=curCard();
+  if(!q){ return finish(); }
+  const retryChip = q._retry>0 ? `<span class="chip retry">🔁 재도전 ${q._retry}</span>` : "";
+  const leech = (missCount[q.id]||0)>=3;
+  const leechChip = leech ? `<span class="chip leech">⚠️ 자주 틀림</span>` : "";
+  stage.innerHTML=`
+    <div class="card">
+      <div class="metarow">
+        <span class="chip">${escapeHtml(q.type||"recall")}</span>
+        <span class="chip d">난이도 ${q.difficulty||"?"}/5</span>
+        ${retryChip}${leechChip}
+      </div>
+      <p class="q" id="qtext"></p>
+      ${q.hint?`<p class="qhint">💭 ${escapeHtml(q.hint)}</p>`:""}
+      <div id="revealSlot">
+        <div class="controls">
+          <button class="reveal" id="revealBtn">💡 답 보기</button>
+        </div>
+      </div>
+    </div>`;
+  mdRender(document.getElementById("qtext"), q.question||"");
+  revealed=false;
+  document.getElementById("revealBtn").onclick=reveal;
+}
+
+function reveal(){
+  revealed=true;
+  const q=curCard();
+  const slot=document.getElementById("revealSlot");
+  const starOn=starMarked.has(q.id);
+  const dunnoOn=repeatMarked.has(q.id);
+  slot.innerHTML=`
+    <div class="answer" id="answer"><span class="lab">ANSWER</span><span id="ansbody"></span></div>
+    <div class="heading-ref">📍 ${escapeHtml((q.note_anchor&&q.note_anchor.heading)||"(위치 정보 없음)")}</div>
+    <div class="controls">
+      <button class="grade g-dunno ${dunnoOn?'on':''}" id="gDunno">🚫 아예 모르겠다</button>
+      <button class="grade g-meh" id="gMeh">😐 애매</button>
+      <button class="grade g-know" id="gKnow">✅ 안다</button>
+      <button class="star ${starOn?'on':''}" id="gStar">⭐ 중요</button>
+    </div>
+    <div class="interact">
+      <textarea id="chatInput" placeholder="이 문제에 대해 물어보기 — 예: '아직 이해가 안 돼, 더 자세히'"></textarea>
+      <div class="irow">
+        <button class="ibtn preset" id="bExplain">🔎 더 자세히</button>
+        <button class="ibtn preset" id="bRegen">🔄 문제 바꿔 다시</button>
+        <button class="ibtn preset" id="bSend">↩ 보내기</button>
+      </div>
+      <div class="chatlog" id="chatlog"></div>
+    </div>`;
+  mdRender(document.getElementById("ansbody"), q.answer||"");
+  document.getElementById("gDunno").onclick=()=>gradeDunno(q);
+  document.getElementById("gMeh").onclick=()=>grade(q,"meh");
+  document.getElementById("gKnow").onclick=()=>grade(q,"known");
+  document.getElementById("gStar").onclick=(e)=>toggleStar(q,e.currentTarget);
+  document.getElementById("bExplain").onclick=()=>chat(q,"explain");
+  document.getElementById("bRegen").onclick=()=>chat(q,"regen");
+  document.getElementById("bSend").onclick=()=>chat(q,"freeform");
+}
+
+// ---------- grading / requeue ----------
+function advance(){
+  // 다음 미확정 카드로. 없으면 종료.
+  for(let i=pos+1;i<queue.length;i++){ if(!settled.has(queue[i].id)){ pos=i; return render(); } }
+  finish();
+}
+function grade(q, kind){
+  if(!settled.has(q.id)){ settled.add(q.id); gradeCount[kind]++; }
+  advance();
+}
+function gradeDunno(q){
+  missCount[q.id]=(missCount[q.id]||0)+1;
+  gradeCount.dunno++;
+  markRepeat(q, true);
+  if(missCount[q.id]>=3){
+    // leech: 무한 재출제 대신 확정 + 표시
+    if(!settled.has(q.id)) settled.add(q.id);
+    advance();
+  }else{
+    // 같은 세션 큐 끝에 재삽입
+    queue.push({...q, _retry:(q._retry||0)+1});
+    advance();
+  }
+}
+
+// ---------- marking (server 결정론) ----------
+async function markReq(q, mark, on){
+  try{
+    const res=await api("/api/mark", {question_id:q.id, mark, on});
+    if(!res.ok){ console.warn("mark 실패", res.error); return false; }
+    return true;
+  }catch(e){ console.warn("mark 요청 실패", e); return false; }
+}
+async function markRepeat(q, on){
+  const ok=await markReq(q,"repeat",on);
+  const head=(q.note_anchor&&q.note_anchor.heading)||q.id;
+  if(ok){ on?repeatMarked.set(q.id,head):repeatMarked.delete(q.id); }
+}
+async function toggleStar(q, btn){
+  const on=!starMarked.has(q.id);
+  const ok=await markReq(q,"star",on);
+  if(ok){
+    const head=(q.note_anchor&&q.note_anchor.heading)||q.id;
+    on?starMarked.set(q.id,head):starMarked.delete(q.id);
+    btn.classList.toggle("on", on);
+  }
+}
+
+// ---------- live tutor chat ----------
+async function chat(q, action){
+  const ta=document.getElementById("chatInput");
+  const userText=(ta.value||"").trim();
+  if(action==="freeform" && !userText){ ta.focus(); return; }
+  const log=document.getElementById("chatlog");
+  // user bubble (explain/regen도 입력이 있으면 같이 표시)
+  const label = action==="explain" ? (userText||"더 자세히 설명해줘")
+              : action==="regen"   ? (userText?("문제 바꿔 다시 — "+userText):"문제 바꿔 다시 내줘")
+              : userText;
+  const ub=document.createElement("div"); ub.className="bubble user";
+  ub.innerHTML=`<span class="who">나</span>${escapeHtml(label)}`; log.appendChild(ub);
+  const tb=document.createElement("div"); tb.className="bubble tutor";
+  tb.innerHTML=`<span class="who">튜터</span><span class="spinner"></span>생각 중… (최대 30초)`;
+  log.appendChild(tb);
+  ta.value=""; setBusy(true);
+  try{
+    const res=await api("/api/chat", {question_id:q.id, action, user_text:userText});
+    if(!res.ok){ tb.innerHTML=`<span class="who">튜터</span><span class="err">응답 실패: ${escapeHtml(res.error||"unknown")}</span>`; }
+    else if(action==="regen" && res.new_question){
+      tb.innerHTML=`<span class="who">튜터</span>새 문제로 바꿨어. 다시 풀어봐 👇`;
+      replaceCard(q, res.new_question);
+    }else{
+      tb.innerHTML=`<span class="who">튜터</span><span class="reply"></span>`;
+      mdRender(tb.querySelector(".reply"), res.reply||"(빈 응답)");
+    }
+  }catch(e){
+    tb.innerHTML=`<span class="who">튜터</span><span class="err">요청 오류: ${escapeHtml(String(e))}</span>`;
+  }finally{ setBusy(false); }
+}
+function setBusy(b){
+  ["bExplain","bRegen","bSend"].forEach(id=>{const el=document.getElementById(id); if(el) el.disabled=b;});
+}
+function replaceCard(oldQ, newQ){
+  // 현재 큐 위치의 문제를 교체하고 다시 풀게 (unrevealed)
+  newQ._retry=oldQ._retry||0;
+  queue[pos]=newQ;
+  render();
+}
+
+// ---------- finish ----------
+function finish(){
+  updateProgress();
+  const rep=[...repeatMarked.values()], star=[...starMarked.values()];
+  const listBlock=(title,arr,icon)=> arr.length?`<h3>${icon} ${title} (${arr.length})</h3><ul>${arr.map(h=>`<li>${escapeHtml(h)}</li>`).join("")}</ul>`:"";
+  stage.innerHTML=`
+    <div class="card done">
+      <div style="font-size:44px">🎉</div>
+      <h2>복습 완료!</h2>
+      <div class="tally">
+        <div class="t"><span class="n">${gradeCount.known}</span><span class="l">✅ 안다</span></div>
+        <div class="t"><span class="n">${gradeCount.meh}</span><span class="l">😐 애매</span></div>
+        <div class="t"><span class="n">${gradeCount.dunno}</span><span class="l">🚫 모르겠다</span></div>
+      </div>
+      <div class="marklist">
+        ${listBlock("다시 볼 것 :repeat:", rep, "🔁")}
+        ${listBlock("중요 표시 ⭐", star, "⭐")}
+        ${(!rep.length&&!star.length)?'<p style="color:var(--sub);text-align:center">마킹된 항목 없음 — 노트는 안 건드려짐.</p>':''}
+      </div>
+      <div class="controls" style="justify-content:center; margin-top:22px">
+        <button class="reveal" style="flex:0 0 auto; padding:12px 26px" onclick="location.reload()">🔁 다시 풀기</button>
+      </div>
+      <p style="color:var(--sub); font-size:12.5px; margin-top:16px">마킹은 소스 노트에 이미 저장됨. git 추적 파일이면 커밋하는 거 잊지 마.</p>
+    </div>`;
+}
+
+// ---------- keyboard ----------
+document.addEventListener("keydown", e=>{
+  if(e.target && (e.target.tagName==="TEXTAREA"||e.target.tagName==="INPUT")) return;
+  if(e.code==="Space" && !revealed){ e.preventDefault(); const b=document.getElementById("revealBtn"); if(b) reveal(); }
+});
+
+boot();
+</script>
+</body>
+</html>

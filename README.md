@@ -1,6 +1,6 @@
 # Claude Code Skills (Theo's personal collection)
 
-Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 11개 스킬 전부 활성화.
+Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 12개 스킬 전부 활성화.
 
 > **2026-05-04 마이그레이션**: 기존 `~/claude-commands/skills/<name>/` → `~/.claude/skills/<name>/` 평탄 구조로 변경. 자세한 내용은 하단 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -19,6 +19,7 @@ Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토
 | [`/paper-digest`](#paper-digest) | Manual | 최근 Scholar-Inbox 스크린샷에서 추천받은 논문들을 자동으로 검색·다운로드·요약·이미지 추출해 ~/For-Neural-Network-Improvement-Private- git repo에 날짜별 md로 정리하는 스킬. 사용자가 "/paper-digest", "오늘 받은 논문 정리해줘", "scholar inbox 정리" 같은 발화로 트리거. |
 | [`/vocab-collect`](#vocab-collect) | Manual | 문서(PDF·md·txt·URL)에서 Theo 수준 영어 단어를 멀티에이전트로 추출·선정해 기존 단어장과 비교 후 새 단어만 양식대로 추가. vocab-quiz와 단어장 공유 |
 | [`/vocab-quiz`](#vocab-quiz) | Manual | `<details>/<summary>` 포맷 단어장을 로컬 웹 퀴즈로 풀고 결과를 md에 아이콘으로 누적 마킹. vocab-collect와 단어장 공유 |
+| [`/recall-quiz`](#recall-quiz) | Manual | 임의 노트 하나로 멀티에이전트가 복습 문제를 생성해 로컬 웹 퀴즈로 풀고, `:repeat:`/`⭐`를 소스 노트 heading에 마킹 + 문제별 라이브 튜터 채팅. warmup/check/recall 3모드 |
 
 ---
 
@@ -32,7 +33,7 @@ git clone git@github.com:Bigenlight/claude-commands.git ~/.claude/skills
 git clone https://github.com/Bigenlight/claude-commands.git ~/.claude/skills
 ```
 
-Restart Claude Code — 11개 스킬 전부 자동 활성화.
+Restart Claude Code — 12개 스킬 전부 자동 활성화.
 
 > 이미 `~/.claude/skills/` 디렉토리가 있으면 먼저 백업하거나 비워야 함. swap 절차는 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -218,6 +219,22 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 ```
 
 **동작**: `server.py`가 로컬 포트(기본 8765)로 퀴즈 웹앱 서빙 → 브라우저에서 풀기 → 정오답이 단어장 블록 아래 아이콘 줄로 누적. 단어장 경로는 인자 > `VOCAB_MD` env > 기본 후보경로 순으로 해석. 773 복습(3회 졸업 💯)과 연동.
+
+---
+
+## recall-quiz
+
+임의 노트(md) 하나로 멀티에이전트가 모드별 복습 문제를 생성 → 로컬 웹 퀴즈로 풀고, 결과(`:repeat:`=다시 볼 것 / `⭐`=중요)를 **소스 노트 heading에 결정론적으로 마킹** + 문제별 **라이브 튜터 채팅**(`claude -p`). `vocab-quiz`의 "마킹=서버 결정론 / 콘텐츠=LLM" 패턴 계승 (단 상호작용은 배치가 아니라 라이브).
+
+```
+/recall-quiz <노트 경로> [mode=warmup|check|recall]
+"이 노트 복습 퀴즈 내줘"
+"오랜만에 복습" / "방금 배운 거 확인 문제" / "공부 전 워밍업"
+```
+
+**모드 3개** (인지과학 근거 기반): `warmup`(공부 전 사전점화 — 틀리는 게 목표) / `check`(당일 직후 인코딩 검증 + 오개념 즉시 교정) / `recall`(오랜만 지연 복습 — interleave·전이).
+
+**파이프라인**: Segment(결정론 heading 분할) → Generate **Sonnet × N 병렬**(섹션별, note_anchor 부착) → Curate **Opus**(모드별 개수·난이도 밸런스) → Review **Opus**(~90% tractable·정답누출·앵커정확성 게이트) → `questions.json` → 로컬 서버(기본 포트 8770). 마킹은 서버가 heading 라인에만 **멱등** 삽입(본문/수식/이미지/코드펜스 안 건드림), 채팅은 텍스트 전용(`--disallowedTools`로 파일 미수정 보장). 문제 생성/검수 원칙은 `references/question-principles.md`(Matuschak·SuperMemo·Bloom·testing/spacing effect 종합). env: `RECALL_PORT`, `RECALL_CHAT_MODEL`(기본 sonnet, Fable 금지).
 
 ---
 

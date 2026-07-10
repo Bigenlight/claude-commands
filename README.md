@@ -1,6 +1,6 @@
 # Claude Code Skills (Theo's personal collection)
 
-Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 12개 스킬 전부 활성화.
+Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 13개 스킬 전부 활성화.
 
 > **2026-05-04 마이그레이션**: 기존 `~/claude-commands/skills/<name>/` → `~/.claude/skills/<name>/` 평탄 구조로 변경. 자세한 내용은 하단 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -20,6 +20,7 @@ Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토
 | [`/vocab-collect`](#vocab-collect) | Manual | 문서(PDF·md·txt·URL)에서 Theo 수준 영어 단어를 멀티에이전트로 추출·선정해 기존 단어장과 비교 후 새 단어만 양식대로 추가. vocab-quiz와 단어장 공유 |
 | [`/vocab-quiz`](#vocab-quiz) | Manual | `<details>/<summary>` 포맷 단어장을 로컬 웹 퀴즈로 풀고 결과를 md에 아이콘으로 누적 마킹. vocab-collect와 단어장 공유 |
 | [`/recall-quiz`](#recall-quiz) | Manual | 임의 노트 하나로 멀티에이전트가 복습 문제를 생성해 로컬 웹 퀴즈로 풀고, `:repeat:`/`⭐`를 소스 노트 heading에 마킹 + 문제별 라이브 튜터 채팅. warmup/check/recall 3모드 |
+| [`/sleep-log`](#sleep-log) | Manual | 삼성헬스(갤럭시핏3) 수면 스크린샷을 vision 인식해 그날 데일리 노트 잠 블록 + sleep-tracking 기록표에 자동 기록. 일별/주별 판별, 여러 장 병합, idempotent 갱신 |
 
 ---
 
@@ -33,7 +34,7 @@ git clone git@github.com:Bigenlight/claude-commands.git ~/.claude/skills
 git clone https://github.com/Bigenlight/claude-commands.git ~/.claude/skills
 ```
 
-Restart Claude Code — 12개 스킬 전부 자동 활성화.
+Restart Claude Code — 13개 스킬 전부 자동 활성화.
 
 > 이미 `~/.claude/skills/` 디렉토리가 있으면 먼저 백업하거나 비워야 함. swap 절차는 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -235,6 +236,19 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 **모드 3개** (인지과학 근거 기반): `warmup`(공부 전 사전점화 — 틀리는 게 목표) / `check`(당일 직후 인코딩 검증 + 오개념 즉시 교정) / `recall`(오랜만 지연 복습 — interleave·전이).
 
 **파이프라인**: Segment(결정론 heading 분할) → Generate **Sonnet × N 병렬**(섹션별, note_anchor 부착) → Curate **Opus**(모드별 개수·난이도 밸런스) → Review **Opus**(~90% tractable·정답누출·앵커정확성 게이트) → `questions.json` → 로컬 서버(기본 포트 8770). 마킹은 서버가 heading 라인에만 **멱등** 삽입(본문/수식/이미지/코드펜스 안 건드림), 채팅은 텍스트 전용(`--disallowedTools`로 파일 미수정 보장). 문제 생성/검수 원칙은 `references/question-principles.md`(Matuschak·SuperMemo·Bloom·testing/spacing effect 종합). env: `RECALL_PORT`, `RECALL_CHAT_MODEL`(기본 sonnet, Fable 금지).
+
+---
+
+## sleep-log
+
+삼성헬스(갤럭시핏3) 수면 스크린샷을 주면 값을 **vision으로 인식**해 (1) 그날 데일리 노트의 잠 블록("어제 잠 시간 및 금일 컨디션 체크")과 (2) `02-areas/sleep-management/sleep-tracking.md` 기록표에 자동 기록. WAKE date(기상일)로 노트를 매핑하고, 일별/주별 스샷을 판별해 주별이면 baseline/주별 추세로 라우팅. 여러 장(상·하 스크롤)이면 같은 날로 병합, 재실행 시 중복 없이 갱신(idempotent). 런타임은 솔로(서브에이전트 없음), 숫자는 이미지 대조 self-check 후 기록.
+
+```
+/sleep-log <수면 스샷 경로 1장+> [주관 텍스트: 기상방식/각성/컨디션/낮잠/한줄]
+"잠 기록" / "수면 스샷 정리" / "어제 잠 기록해줘"
+```
+
+**동작**: 스샷 vision 추출(TIB/TST/단계/회복/SpO2 + 한국어 시간포맷 변환) → WAKE date로 데일리 노트 탐색(루트 → 00-inbox → 05-daily → 전역) → 잠 블록 삽입/갱신 + 기록표 날짜순 삽입 → 원본 스샷 `08-assets/<YYYY>/sleep/` 보관. 카페인·음주는 추적 안 함(교란은 낮잠만), 권장 실행 시점은 밤(운동·오후 컨디션 확정 후).
 
 ---
 

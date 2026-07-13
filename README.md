@@ -14,7 +14,7 @@ Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토
 | [`/md-img-resize`](#md-img-resize) | Manual | Auto-resize markdown image widths based on actual image dimensions |
 | [`/skill-publish`](#skill-publish) | Manual | Publish a ~/.claude/skills skill to the claude-commands repo, update README, and push |
 | [`/weekly-review`](#weekly-review) | Manual | Automates PARAZETTEL vault weekly review note generation with multi-agent data collection, synthesis, and validation |
-| [`/us-stock-advisor`](#us-stock-advisor) | Manual | 미국 주식 시장 조사 + 전략 판단 + 리스크 리뷰를 멀티에이전트로 수행하고, 결과를 슬랙 DM으로 전송 |
+| [`/us-stock-advisor`](#us-stock-advisor) | Manual | 결정론적 파이썬 코어가 레짐·비중·주문을 계산하고 LLM은 veto/override만; 기본값=지수 100% 투자, 매월 실행·QQQ 대비 자기 채점 (v5) |
 | [`/multi-agent-research`](#multi-agent-research) | Manual | Survey/compare/verify 5+ papers·docs·repos and produce a single consolidated markdown report — Sonnet × N parallel extraction + Opus audit + Opus consolidation pipeline |
 | [`/paper-digest`](#paper-digest) | Manual | 최근 Scholar-Inbox 스크린샷에서 추천받은 논문들을 자동으로 검색·다운로드·요약·이미지 추출해 ~/For-Neural-Network-Improvement-Private- git repo에 날짜별 md로 정리하는 스킬. 사용자가 "/paper-digest", "오늘 받은 논문 정리해줘", "scholar inbox 정리" 같은 발화로 트리거. |
 | [`/vocab-collect`](#vocab-collect) | Manual | 문서(PDF·md·txt·URL)에서 Theo 수준 영어 단어를 멀티에이전트로 추출·선정해 기존 단어장과 비교 후 새 단어만 양식대로 추가. vocab-quiz와 단어장 공유 |
@@ -159,10 +159,10 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 
 ## us-stock-advisor
 
-미국 주식 시장 조사 + 전략 판단 + 리스크 리뷰를 멀티에이전트로 수행하고, 결과를 슬랙 DM으로 전송. 뉴스·매크로·기술적 분석 → 전략 수립 → 리스크 검토 → 검증 → 슬랙 보고 파이프라인. KIS API/실거래 없이 순수 리서치·판단만.
+미국 주식 코어-새틀라이트 어드바이저 (v5 — "기계적 코어, LLM은 가석방"). 결정론적 파이썬 코어(`core.py`)가 레짐(QQQ 월봉 vs 10개월 SMA)·목표비중·주문을 전부 계산해 **이미 승인된** baseline을 내고, LLM은 (a) 근거·URL 기반 veto 추출과 (b) 비용을 지불하고 로깅되며 만료되는 override 채널만 담당한다. **기본 상태는 지수 100% 투자 — 현금은 스키마에서 삭제**되어 "관망"이 불가능하다. 결정론적 게이트(`validate.py`)가 유일 심판이고 실패 시 baseline이 무수정 실행된다. 데일리 삭제(월 1회 + 입금/이벤트), 매 실행 누적 성과를 QQQ와 대조해 리포트 첫 줄에 강제 표기하고 기준 미달 시 LLM 권한을 자동 폐지한다. Phase 1 리서치는 tool 제한 읽기전용 에이전트로 격리. KIS API/실거래 없이 리서치·판단만.
 
 ```
-/us-stock-advisor <포트폴리오 정보 — 현금 잔고(USD), 보유 종목(ticker, 수량, 평단가)>
+/us-stock-advisor <portfolio.json 경로 또는 현금(USD)+보유종목(ticker,수량,평단가)> [--deposit KRW입금액] [--weekly] [--event <사유>]
 ```
 
 ---

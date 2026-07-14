@@ -115,8 +115,10 @@ execute, and "the script failed so I'll decide myself" is exactly the failure mo
 this version exists to delete.
 A halt is never silent: run `python3 scripts/report.py --halt "<reason>"`, which
 appends a `{"type":"pipeline_halt"}` line to `recommendations.jsonl`; send the
-*failure* (not a recommendation) to Slack, and re-arm the trigger for the next
-session. "Nothing happened" being invisible was 84% of v4's runs.
+*failure* (not a recommendation) to Slack **by the same mandatory, pre-authorized
+route as a normal report (§Slack delivery — DM `U0AD7V4SWD9`, do not ask)**, and
+re-arm the trigger for the next session. A halt the user never sees is not a halt,
+it is a disappearance. "Nothing happened" being invisible was 84% of v4's runs.
 
 ---
 
@@ -346,10 +348,12 @@ or ask a model whether it agrees.
 
 ## Phase 4 — Korean report + logging · **script numbers, LLM prose**
 
-Run:
+Run, in order — **all three steps, every run**:
 ```
-python3 scripts/report.py --log --baseline state/baseline_plan.json --final state/final_plan.json [--deposit USD]
-python3 scripts/report.py --header
+1. python3 scripts/report.py --log --baseline state/baseline_plan.json --final state/final_plan.json [--deposit USD]
+2. python3 scripts/report.py --header
+3. SEND the Korean report to Slack (see §Slack delivery below). The run is NOT
+   complete until this step has executed.
 ```
 
 `report.py` appends **exactly one `portfolio_mark` line per run — including no-ops
@@ -378,8 +382,32 @@ honesty clause**, verbatim in substance:
 Also disclose, every run: cash %, that the core carries **no stop** (overnight gap
 risk is accepted beta), and any active override with its expiry date.
 
-**Slack send happens here, in the top-level agent thread, and nowhere else.** No
-subagent has, or will ever be given, Slack tools.
+### Slack delivery — MANDATORY, PRE-AUTHORIZED, DO NOT ASK
+
+The Slack DM **is the deliverable**. A run that computes a plan and does not deliver
+it has not run; "nothing happened" being invisible was 84% of v4's runs, and a report
+that stops in the agent's own transcript is that same defect wearing a nicer outfit.
+
+- **Destination: a Slack DM to the user (self-DM), `channel_id = U0AD7V4SWD9`.**
+  There is **no channel, no webhook, and no config entry** for this — do not go
+  looking for one, do not conclude it is missing, and **do not ask the user which
+  channel to use.** (Every prior version's report was a DM. The absence of a channel
+  ID in `config.py` is not a misconfiguration; it is the design.)
+- **Tool:** the Slack MCP send-message tool, called from the top-level agent thread.
+- **Authorization:** invoking this skill IS the authorization to send. This step is
+  pre-approved, standing, and needs no per-run confirmation. Do not draft-and-ask.
+  Do not send a draft tool call. Send it.
+- **Slack send happens in the top-level agent thread and nowhere else.** No subagent
+  has, or will ever be given, Slack tools.
+- If the send fails (auth, network, tool unavailable), say so explicitly in the reply
+  and hand the user the full report text verbatim so the run is still delivered.
+
+*Why this is spelled out to the point of tedium:* v5's original Phase 4 mentioned
+Slack eight times and never once said **where to send it, with what, or that no
+permission was needed.** Every mention was a *prohibition* (which subagent may not
+send, which thread must). A fresh agent correctly read that negative space, found no
+destination, and stopped to ask — turning a mandatory delivery into a blocked run.
+Constraints on a step are not the same as the step.
 
 **Ledger integrity.** `recommendations.jsonl` is an append-only sha256 hash chain
 (each line carries `prev_hash` = sha256 of the prior line), **anchored** by a tip
@@ -405,7 +433,9 @@ v4.1's merged fixes dead letter for seven consecutive runs.
 
 **FORBIDDEN (Phase 4):** producing any number not emitted by a script; omitting the
 header; omitting a losing trade or a failed override from the log; writing the log
-anywhere under `reports/`.
+anywhere under `reports/`; **ending the run without sending the Slack DM**; **asking
+the user for a channel, for permission to send, or whether to send** (the destination
+is fixed and the authorization is standing — see §Slack delivery).
 
 ---
 
@@ -550,6 +580,7 @@ until `recommendations.jsonl` and `score_recs.py` are in place.
 | decision log | `~/.claude/skills/us-stock-advisor/state/recommendations.jsonl` |
 | structured continuity | `~/.claude/skills/us-stock-advisor/state/last_run.json` |
 | **read-only researcher** | `~/.claude/agents/stock-research-readonly.md` |
+| **report destination** | Slack **DM to the user**, `channel_id = U0AD7V4SWD9` (no channel, no webhook, no config entry — by design) |
 
 Nightly cron: `0 14 * * 1-5  python3 ~/.claude/skills/us-stock-advisor/scripts/score_recs.py --score`
 
@@ -581,3 +612,10 @@ Nightly cron: `0 14 * * 1-5  python3 ~/.claude/skills/us-stock-advisor/scripts/s
 8. Every symbol in `config.py` is referenced by at least one script — verified by
    grep in CI. A constant no script reads is v4's double-bookkeeping bug relocated
    into Python.
+9. **Delivery is specified, not merely constrained.** `grep -n -i slack SKILL.md`
+   must return, alongside the prohibitions, at least one line naming (a) the
+   destination `U0AD7V4SWD9`, (b) the tool, and (c) the standing authorization. A
+   skill that only ever says who may *not* send, and never says where to send, reads
+   to a fresh agent as an unconfigured step — and it will stop and ask, which on a
+   cron/headless run means the report is never delivered at all. Do not let the
+   Slack mentions decay back into pure negative space.

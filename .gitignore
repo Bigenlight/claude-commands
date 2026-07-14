@@ -21,3 +21,6 @@ multi-agent-research/REVIEW_v2.md
 # vocab-quiz 런타임 산출물 (퀴즈 진행상태/피드백 — 코드 아님)
 vocab-quiz/feedback.json
 vocab-quiz/results.json
+
+# us-stock-advisor 런타임 상태 (실제 계좌 잔고/보유내역 + 결정 원장 — 개인 금융정보, 코드 아님)
+us-stock-advisor/state/

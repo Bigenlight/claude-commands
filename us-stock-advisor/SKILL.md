@@ -361,7 +361,23 @@ Run, in order — **all three steps, every run**:
 `state/recommendations.jsonl` (in the skill directory, **never** under
 `reports/`). It then computes the mandatory header block.
 
-**The Korean report MUST open with the header, in the first five lines:**
+**The Korean report MUST open with the BOTTOM-LINE ACTION block, then the header.**
+
+The very first thing in the report — line 1, above everything, before the
+self-grade header — is the concrete action the human should take, stated as an
+instruction, not a summary. It answers *"그래서 내가 지금 뭘 하면 돼?"* in one glance.
+Keep it to 1–3 lines. Name the actual order(s) to place (or explicitly "오늘은
+아무것도 하지 마세요"), and, when the run is gated on a pending event (deposit landing,
+earnings, regime), name that next trigger. It restates the executed plan for the
+human — it may not invent a decision the pipeline did not make (no new orders, no
+regime call, no allocation the validator did not pass).
+
+```
+👉 오늘의 최종 행동: <구체적 지시 — 예: "NVDA 0.2348주 매도, 대금 QQQ로" 또는 "아무것도 하지 마세요">
+   다음 트리거: <있으면 — 예: "며칠 뒤 비상금 재입금 시 알려주면 QQQ 일시불 배분 계산">
+```
+
+**Immediately below the action block, the mandatory self-grade header (unchanged):**
 
 ```
 📊 누적 수익률: X.XX%   |   QQQ 벤치마크: Y.YY%   |   vs QQQ: ±Z.ZZ%p
@@ -369,8 +385,10 @@ Run, in order — **all three steps, every run**:
 🎯 적중률 vs QQQ: H%  (다트판 기준선 39.8%)
 ```
 
-Those numbers come from `score_recs.py`. **The LLM may not restate, round,
+Those header numbers come from `score_recs.py`. **The LLM may not restate, round,
 re-derive, or soften them.** A skill that never grades itself is how we got here.
+The action block sits *above* the header; it never replaces, hides, or edits it —
+the self-grade stays fully visible on every run.
 
 Report body: regime + why (the SMA line), the executed orders, satellite state,
 vetoes with URLs, and — whenever a satellite position exists — the **satellite
@@ -432,7 +450,8 @@ regime, targets, active override. **Never report prose.** Do not read
 v4.1's merged fixes dead letter for seven consecutive runs.
 
 **FORBIDDEN (Phase 4):** producing any number not emitted by a script; omitting the
-header; omitting a losing trade or a failed override from the log; writing the log
+bottom-line action block or the self-grade header, or letting the action block
+replace/hide/edit the header; omitting a losing trade or a failed override from the log; writing the log
 anywhere under `reports/`; **ending the run without sending the Slack DM**; **asking
 the user for a channel, for permission to send, or whether to send** (the destination
 is fixed and the authorization is standing — see §Slack delivery).

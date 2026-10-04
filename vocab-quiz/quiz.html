@@ -183,6 +183,7 @@ async function finish(){
     if(j.ok && fbN>0){
       msg += `<br>✏️ 피드백 <b>${fbN}개</b> 저장됨 → 채팅으로 돌아가 "피드백 반영해줘" 라고 하면 Claude가 일괄 반영함.`;
     }
+    msg += '<br><button class="b-next" style="flex:none;padding:12px 26px;margin-top:14px" onclick="location.reload()">🔀 한 판 더</button>';
     msg += '<br><span style="opacity:.7">이 창은 닫아도 됨.</span>';
     document.getElementById('savemsg').innerHTML = msg;
   }catch(e){
@@ -194,7 +195,15 @@ function shuffle(a){
   for(let j=a.length-1;j>0;j--){ const k=Math.floor(Math.random()*(j+1)); [a[j],a[k]]=[a[k],a[j]]; }
   return a;
 }
-fetch('/api/items').then(r=>r.json()).then(d=>{ items=shuffle(d); render(); });
+// 덱 설정(md frontmatter quiz-batch)이 있으면 섞은 뒤 앞 N개만 한 판으로 출제
+Promise.all([
+  fetch('/api/items').then(r=>r.json()),
+  fetch('/api/config').then(r=>r.json()).catch(()=>({batch:0})),
+]).then(([d,cfg])=>{
+  items=shuffle(d);
+  if(cfg.batch>0) items=items.slice(0,cfg.batch);
+  render();
+});
 </script>
 </body>
 </html>

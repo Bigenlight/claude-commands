@@ -58,6 +58,24 @@ def write_md(text):
         f.write(text)
 
 
+def deck_config(text):
+    """md frontmatter의 덱별 퀴즈 설정. 없으면 기본값(전체 출제, 3연속 졸업).
+    - quiz-batch: N        → 한 판에 랜덤 N개만 출제 (0/없음 = 전체)
+    - quiz-graduate: false → 연속 ✅여도 💯 졸업 안 시키고 계속 출제
+    """
+    cfg = {"batch": 0, "graduate": True}
+    fm = re.match(r"\A---\r?\n(.*?)\r?\n---", text, re.S)
+    if fm:
+        # 값 뒤 `# 주석` 허용
+        b = re.search(r"^quiz-batch:\s*(\d+)\s*(?:#.*)?$", fm.group(1), re.M)
+        g = re.search(r"^quiz-graduate:\s*(\w+)\s*(?:#.*)?$", fm.group(1), re.M)
+        if b:
+            cfg["batch"] = int(b.group(1))
+        if g:
+            cfg["graduate"] = g.group(1).lower() not in ("false", "no", "0")
+    return cfg
+
+
 def _section_of(text, pos):
     concept_h = text.find("## 주목할만한 개념")
     vocab_h = text.find("## 영어 단어 및 표현")
@@ -69,6 +87,7 @@ def _section_of(text, pos):
 def parse_items(text):
     """퀴즈용 항목 리스트. 연속 3✅ 졸업 항목은 제외하되 id(=블록 순번)는 유지."""
     items = []
+    graduate = deck_config(text)["graduate"]
     for idx, m in enumerate(BLOCK_MARK_RE.finditer(text)):
         block = m.group(1)
         marker = m.group(2) or ""
@@ -85,7 +104,7 @@ def parse_items(text):
         mastered = (GRAD in marker) or (
             len(icons) >= MASTER_STREAK and all(x == "✅" for x in icons[-MASTER_STREAK:])
         )
-        if mastered:
+        if mastered and graduate:
             continue
         items.append({
             "id": idx,
@@ -119,6 +138,7 @@ def block_index(text):
 def apply_icons(statuses):
     """각 블록 아래 줄에 아이콘 누적 추가. statuses: {str(id): status}."""
     text = read_md()
+    graduate = deck_config(text)["graduate"]
     counter = {"i": -1}
 
     def repl(m):
@@ -133,7 +153,7 @@ def apply_icons(statuses):
         line = (marker.rstrip() + " " + icon) if marker.strip() else ("\n" + icon)
         # 연속 3✅ 달성 & 아직 졸업 안 했으면 💯 부여
         icons = re.findall(ICON_RE, line)
-        if GRAD not in line and len(icons) >= MASTER_STREAK and all(
+        if graduate and GRAD not in line and len(icons) >= MASTER_STREAK and all(
             x == "✅" for x in icons[-MASTER_STREAK:]
         ):
             line = line + " " + GRAD
@@ -186,6 +206,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, f.read(), "text/html")
         elif self.path == "/api/items":
             self._send(200, json.dumps(parse_items(read_md()), ensure_ascii=False))
+        elif self.path == "/api/config":
+            self._send(200, json.dumps(deck_config(read_md())))
         else:
             self._send(404, "not found", "text/plain")
 

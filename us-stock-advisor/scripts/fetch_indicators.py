@@ -28,11 +28,14 @@ rejected 43 names that then returned +9.05% (+6.67pp vs QQQ).
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from datetime import datetime, time as dtime, timezone
 
-MAX_AGE_H = 96
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import config as C  # noqa: E402
+import core  # noqa: E402  (atr_levels: the ONE definition of stop/target/R-R)
 
 
 def _imp():
@@ -180,7 +183,12 @@ def _compute(hist):
         "relative_volume": _r(rel), "momentum_12_1_pct": _r(mom),
         "signal": sig, "signal_score": score, "signal_confidence": conf,
         "signal_reasons": reasons[:4],
-        "stale": age > MAX_AGE_H,
+        "stale": age > C.MAX_DATA_AGE_HOURS,
+        # informational: the same script-owned bracket core.py emits in
+        # baseline.satellite.levels (stop = SATELLITE_STOP_ATR_MULT x ATR,
+        # target = SHADOW_TARGET_ATR_MULT x ATR). Not a gate, not a forecast.
+        "levels": core.atr_levels(price, atr),
+        "levels_target_atr_mult": C.SHADOW_TARGET_ATR_MULT,
     }
 
 

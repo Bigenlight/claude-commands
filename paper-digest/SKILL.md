@@ -141,6 +141,8 @@ crop할 때 단순히 좌상단부터 자르면 좌측 column의 텍스트만 �
 
 → Read로 페이지를 볼 때 **figure가 페이지의 어느 사분면(좌상/우상/좌하/우하 또는 가로 spanning)에 있는지 먼저 식별**하고, 그에 맞는 offset으로 crop한다.
 
+> **⚠️ 임시 파일 경로 (v1.9.1, 2026-09-28)**: sub-agent 여러 명이 병렬로 돌 때 `/tmp/cropped.png` 같은 공용 이름을 쓰면 **서로 덮어써서 엉뚱한 논문 figure가 섞임** (실제 발생: ZETA↔IL-robustness, ZETA↔One-Demo). 반드시 `SLUG_DIR`이 들어간 고유 경로 사용.
+
 #### Crop 절차
 
 각 `key_*.png` 마다:
@@ -150,26 +152,26 @@ crop할 때 단순히 좌상단부터 자르면 좌측 column의 텍스트만 �
 4. 영역이 페이지의 50% 미만이면 imagemagick `convert`로 crop. **figure 위치에 따라 offset 다르게**:
    ```bash
    # figure가 우측 column 상단에 있는 경우
-   convert key_N_teaser.png -crop 50%x60%+50%+5% +repage /tmp/cropped.png
+   convert key_N_teaser.png -crop 50%x60%+50%+5% +repage /tmp/cropped_<SLUG_DIR>_N.png
    # figure가 가로 전체 spanning, 페이지 중간 위치
-   convert key_N_arch.png -crop 95%x40%+2%+30% +repage /tmp/cropped.png
+   convert key_N_arch.png -crop 95%x40%+2%+30% +repage /tmp/cropped_<SLUG_DIR>_N.png
    # figure가 좌측 column 하단
-   convert key_N_results.png -crop 50%x40%+0%+55% +repage /tmp/cropped.png
+   convert key_N_results.png -crop 50%x40%+0%+55% +repage /tmp/cropped_<SLUG_DIR>_N.png
    ```
 5. **권장 여유**: figure/table 경계 바깥으로 5~10% 패딩 유지 (캡션 포함). 캡션이 살짝 잘려도 figure 본체가 잘 보이면 OK
 
 #### 자기 검증 (v1.8 추가, 필수)
 
 6. **crop 후 결과를 Read 도구로 다시 본다** — 이미지에 figure/table/graph가 실제로 dominant하게 보이는가?
-   - ✅ figure/table이 잘 보임 → OK, `mv /tmp/cropped.png key_N_*.png`로 덮어쓰기
+   - ✅ figure/table이 잘 보임 → OK, `mv /tmp/cropped_<SLUG_DIR>_N.png key_N_*.png`로 덮어쓰기
    - ❌ **텍스트만 보이거나, figure의 일부분만 잘려 보이거나, 의미 없는 빈 공간** → **즉시 페이지 원본으로 롤백** (cropped 파일 폐기, 원본 유지)
    ```bash
    # 검증 후 OK면 덮어쓰기, 아니면 폐기
    # (Read 도구 결과를 보고 판단)
-   if [ "$(identify -format '%w' /tmp/cropped.png)" -ge 300 ] && [ "$(identify -format '%h' /tmp/cropped.png)" -ge 300 ]; then
-     mv /tmp/cropped.png key_N_main_results.png  # crop이 실제로 figure 잘 잡았다고 판단한 경우만
+   if [ "$(identify -format '%w' /tmp/cropped_<SLUG_DIR>_N.png)" -ge 300 ] && [ "$(identify -format '%h' /tmp/cropped_<SLUG_DIR>_N.png)" -ge 300 ]; then
+     mv /tmp/cropped_<SLUG_DIR>_N.png key_N_main_results.png  # crop이 실제로 figure 잘 잡았다고 판단한 경우만
    else
-     rm -f /tmp/cropped.png  # 너무 작음, 폐기
+     rm -f /tmp/cropped_<SLUG_DIR>_N.png  # 너무 작음, 폐기
    fi
    ```
 7. crop 결과가 너무 작거나(<300×300), 식별 실패, 또는 검증 실패 시 → 원본(페이지 전체) 유지. **실패해도 워크플로우 중단 금지**

@@ -1,0 +1,9 @@
+{"decider_id":"D1_TREND","regime_seen":"UP",
+ "target_weights":{"CORE":0.87,"SGOV":0.0,"NVDA":0.13},
+ "positions":[{"ticker":"NVDA","action":"ENTER","reason_code":"GUIDANCE_RAISE","evidence_ids":["E1","E2"],
+   "horizon_weeks":8,"expected_excess_vs_qqq_pp":3.0,
+   "kill_conditions":[{"type":"PRICE_BELOW","value":205.0},{"type":"DATE","value":"2026-12-05"},
+                      {"type":"EVENT","value":"guidance below consensus at next print"}],
+   "thesis_30w":"[mock] Guidance raise not yet fully priced; one buffered lot fits the per-name cap."}],
+ "derisk":{"sgov_weight":0.0,"reason_code":null,"evidence_ids":[]},
+ "p_qqq_up_20d":0.6,"dissent_note":"[mock] Trend intact; no derisk case."}

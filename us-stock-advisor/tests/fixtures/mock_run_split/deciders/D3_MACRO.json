@@ -1,0 +1,8 @@
+{"decider_id":"D3_MACRO","regime_seen":"UP",
+ "target_weights":{"CORE":0.88,"SGOV":0.0,"PLTR":0.12},
+ "positions":[{"ticker":"PLTR","action":"ENTER","reason_code":"CONTRACT_PRODUCT","evidence_ids":["E5"],
+   "horizon_weeks":6,"expected_excess_vs_qqq_pp":2.0,
+   "kill_conditions":[{"type":"PRICE_BELOW","value":170.0},{"type":"EVENT","value":"contract cancelled or delayed"}],
+   "thesis_30w":"[mock] Government contract."}],
+ "derisk":{"sgov_weight":0.0,"reason_code":null,"evidence_ids":[]},
+ "p_qqq_up_20d":0.5,"dissent_note":"[mock] split scenario"}

@@ -1,165 +1,176 @@
 #!/usr/bin/env python3
-"""us-stock-advisor v5 — SINGLE SOURCE OF TRUTH for every number.
+"""us-stock-advisor v6.0 — SINGLE SOURCE OF TRUTH for every constant.
 
 Install path: ~/.claude/skills/us-stock-advisor/scripts/config.py
 
-RULE (v5, non-negotiable): SKILL.md contains NO gating thresholds. If a number
-gates a decision, it lives here and only here. The v4 config.py/SKILL.md double
-bookkeeping (min_reward_risk 1.8 vs 2.0) is what this file deletes.
+RULE: SKILL.md carries no gating number. If a number gates a decision, it lives here
+and only here. Agents never see this file; Python enforces it.
+
+USER OVERRIDES vs v6_decision_spec.md (Theo, 2026-10-08): SLEEVE_MAX_PCT 0.35->0.50,
+SLEEVE_MAX_POSITIONS 2->3, SLEEVE_POSITION_MAX_PCT 0.20->0.25, SLEEVE_TRIM_ABOVE_PCT
+0.30->0.35, SGOV_MAX_UP 0.20->0.30, SGOV_MAX_DOWN 0.50->0.60. Damage caps T1/T2 as spec.
 """
-
 from __future__ import annotations
+
 import os
+from datetime import timedelta, timezone
 
-# ---------------------------------------------------------------- benchmark
-BENCHMARK = "QQQ"                 # the core asset AND the accountability yardstick
-CORE_TICKER = "QQQ"                # regime ticker + benchmark + primary core line
-CORE_TICKERS = ("QQQ", "QQQM")    # ONE combined core sleeve (same index; QQQM/QQQ
-                                  # price ratio ~0.41, std ~0.0001). Core value /
-                                  # weight / drift are the SUM over these. Order =
-                                  # whole-share tie-break order. Never converted
-                                  # into each other (no SELL QQQ -> BUY QQQM path).
-
-# ---------------------------------------------------------------- regime
-# Faber 10-month SMA on MONTHLY CLOSES. One term. No macro-fear term. No VIX.
-REGIME_SMA_MONTHS = 10
-REGIME_EVAL = "monthly_close"     # never intramonth
-MIN_MONTHS_BETWEEN_REGIME_FLIPS = 1
-
-# ---------------------------------------------------------------- allocation
-TARGETS = {
-    # regime -> (core_qqq_pct, satellite_budget_pct)
-    "TREND":     (0.90, 0.10),
-    "DEFENSIVE": (0.50, 0.00),
-}
-CASH_TARGET_PCT = 0.00            # cash is not an allocation. It is a residual.
-CASH_MAX_PCT = 0.05               # operational float only (FX/settlement)
-DEFENSIVE_CASH_EQUIV = "KRW MMF / 파킹통장"   # DEFENSIVE de-risk destination
-
-REBALANCE_DRIFT_BAND_PCT = 0.05   # act only when |actual - target| > 5pp
-FRACTIONAL_SHARES = False         # the broker cannot buy fractional shares. Orders
-                                  # are integer share counts; True restores the v5.0
-                                  # single fractional core line (one-symbol switch).
-MIN_ORDER_USD = 20.0              # below this an order line is not emitted; also the
-                                  # tie width of the whole-share max-deploy search
-WHOLE_SHARE_PRICE_BUFFER_PCT = 0.01   # a share "fits" iff px*(1+this) <= budget:
-                                      # covers commission + FX + an overnight gap so an
-                                      # emitted order is executable at the next open
-
-# gating the allocation % while trusting the derivation is a hole: a plan that is
-# 100% equity on paper can execute 100% cash. These bound the paper<->execution gap
-# and the total book so no short/leverage/cash-leak passes the % gate.
-ALLOCATION_SUM_TOLERANCE_PP = 0.5      # sum(weights) may not exceed 100 by more than this
-EXECUTION_DIVERGENCE_TOLERANCE_PP = 2.0  # |derived-order equity − intended equity| ceiling
-CONFIRM_ALLOCATION_TOLERANCE_PP = 0.5    # CONFIRM_BASELINE: collapsed allocation must equal
-                                         # the baseline's (ideal or realised) per key
-
-# ---------------------------------------------------------------- satellite
-SATELLITE_MAX_PCT = 0.10          # of total portfolio
-SATELLITE_MAX_NAMES = 2
-SATELLITE_MIN_HOLD_DAYS = 20
-SATELLITE_MAX_ROUNDTRIPS_PER_YEAR = 6
-SATELLITE_MIN_RR = 1.5            # was 2.0/1.8. Satellite-only. Never gates the core.
-SATELLITE_STOP_ATR_MULT = 1.5
-SATELLITE_RSI_HALVE_ABOVE = 75.0  # overbought is a SIZING input, never a veto
-EARNINGS_BLACKOUT_SESSIONS = 3    # no satellite entry within N sessions of earnings
-SATELLITE_REAL_MONEY_ENABLED = False   # shadow-only until graduation. A HUMAN edits this
-                                       # line; nothing in the pipeline ever flips it.
-
-# ---------------------------------------------------------------- shadow satellite
-# Paper track: the LLM names tickers + catalysts; core.py owns every level.
-SHADOW_MAX_PICKS_PER_RUN = 3
-SHADOW_TARGET_ATR_MULT = 3.0      # target = px + this * ATR14 (stop = px - SATELLITE_STOP_ATR_MULT * ATR14)
-                                  # => R/R is a constant bracket ratio, not a forecast
-SHADOW_HORIZON_DAYS = 20          # trading days; grading horizon for the hit rate
-SHADOW_REPICK_COOLDOWN_DAYS = 28  # calendar days; same-ticker re-pick lockout
-SHADOW_GRADUATION_MIN_PICKS = 20  # graded (+20d matured) picks required
-SHADOW_GRADUATION_MAX_PVALUE = 0.10   # one-sided exact binomial vs DARTBOARD_BASE_RATE
-SHADOW_GRADUATION_MIN_MEAN_EXCESS_PP = 0.0
-
-# ---------------------------------------------------------------- caps
-SINGLE_NAME_MAX_PCT = 0.40        # was 25%. Applies to SINGLE NAMES only.
-BROAD_ETF_UNCAPPED = True         # QQQ/SPY/VOO/VTI are NOT single names. No cap. Ever.
-BROAD_ETFS = {"QQQ", "SPY", "VOO", "VTI", "IVV", "QQQM"}
-
-# ---------------------------------------------------------------- override channel
-OVERRIDE_MAX_EQUITY_REDUCTION_PCT = 0.10   # may cut equity at most 10pp below target
-OVERRIDE_CATALYST_MAX_AGE_HOURS = 24
-OVERRIDE_EXPIRY_TRADING_DAYS = 10
-OVERRIDE_SUSPEND_AFTER_N_BAD = 3           # 3 consecutive negative-spread overrides
-OVERRIDE_SUSPENSION_DAYS = 90              # one calendar quarter, enforced in code
-
-# ---------------------------------------------------------------- accountability
-DARTBOARD_BASE_RATE = 0.398       # P(random pick beats matched-window QQQ) on this universe
-TRACK_RECORD_WINDOW = 20          # last N decisions injected into Phase 2
-KILL_SATELLITE_IF_SPREAD_BELOW_PP = -1.0   # vs mechanical baseline, after ...
-KILL_EVAL_TRADING_DAYS = 125               # ~6 months of forward, post-cutoff data
-KILL_MIN_OVERRIDE_HITRATE = 0.45
-UNEXPLAINED_FLOW_WARN_PCT = 0.03  # |implied − declared external flow| / total -> warning
-                                  # (also the per-mark absolute leg of flow verification)
-# A DECLARED flow is verified only when the ledger CORROBORATES it (score_recs.
-# reconcile_flows), not merely when it is close: all three legs must hold.
-FLOW_VERIFY_MAX_REL_DEV = 0.25    # |declared − implied| <= this × |declared| (an implied
-                                  # flow near zero cannot verify a non-trivial declaration)
-FLOW_VERIFY_CUM_DEV_MAX_PCT = 0.03    # Σ|declared − implied| over every VERIFIED flow, in
-                                      # ledger order, <= this × the receiving mark's total:
-                                      # many small deviations cannot add up
-ADJ_DUP_ABS_USD = 0.05            # near-duplicate flow tolerance = max(this, ADJ_DUP_REL ×
-ADJ_DUP_REL = 0.005               # |flow|): --adjust-flow repeats and re-logged --deposit/--withdraw
-OVERRIDE_HITRATE_MIN_DECIDED = 3  # override_privileges_at_risk needs this many hit/miss grades
-EXPAND_SATELLITE_IF_HITRATE_ABOVE = 0.398
-BOARD_RECONVENE_IF_CORE_TRAILS_QQQ_PP = 3.0   # over 12 months
-
-# ---------------------------------------------------------------- backtest acceptance
-# core.py --backtest walks the archived v4.1 window bar-by-bar through
-# compute_regime + build_plan with costs charged. These are the pass/fail bars.
-BACKTEST_WINDOW = "2026-04-21:2026-07-10"   # the 46-run v4.1 window
-V4_REALIZED_RETURN_PCT = 1.78               # what v4.1 actually made over it
-BACKTEST_MIN_SESSIONS = 55                  # the window is 56 sessions long
-BACKTEST_MIN_TREND_SESSIONS = 45            # honest walk: March's monthly close was
-                                            # BELOW the SMA, so the mechanical core is
-                                            # DEFENSIVE for the April sessions. It is
-                                            # not TREND for all 56 and never was.
-BACKTEST_MIN_RETURN_PCT = 8.0               # >> V4_REALIZED_RETURN_PCT, < buy&hold QQQ
-                                            # (the April de-risk is the insurance premium)
-
-# ---------------------------------------------------------------- data hygiene
-DROP_PARTIAL_BAR = True           # today's in-progress bar is NOT a close
-AUTO_ADJUST = True
-MAX_DATA_AGE_HOURS = 96
-BASELINE_MAX_AGE_HOURS = 6          # validate.py HALTs on a baseline_plan.json whose
-                                    # generated_utc is older (or missing / in the
-                                    # future): a plan left behind by a failed core.py
-                                    # run is not this run's approved plan
-FRESH_CATALYST_MAX_AGE_HOURS = 72   # satellite entry catalyst; monthly cadence
-                                    # + 24h ≈ zero entries ≈ the kill trigger's
-                                    # n>=10 sample never accrues. Overrides stay 24h.
-VETO_MAX_AGE_DAYS = 7               # Phase 1 veto evidence
-URL_CHECK_TIMEOUT_S = 5             # HEAD-resolvability check in validate.py
-CRON_LOG_MAX_KIB = 1024             # install_cron.sh rotates score_cron.log above this
-                                    # (one generation kept); read via score_recs.py
-SHOCK_MOVE_PCT = 0.07               # single-session move on a held name that is an
-                                    # event trigger; below it, single-day noise is
-                                    # by design not an event.
-
-# ---------------------------------------------------------------- costs (KIS)
-FX_SPREAD_PCT = 0.001             # 0.1% preferential KRW<->USD
-COMMISSION_PCT = 0.0007
-CGT_ALLOWANCE_KRW = 2_500_000     # 250만원/yr — buy-and-hold usually never touches it
+VERSION = "6.0.0"
+KST = timezone(timedelta(hours=9), "KST")
 
 # ---------------------------------------------------------------- paths
-SKILL_DIR = os.path.expanduser("~/.claude/skills/us-stock-advisor")
-# US_ADVISOR_STATE lets tests/backtests redirect state to a scratch dir.
-STATE_DIR = os.environ.get("US_ADVISOR_STATE", os.path.join(SKILL_DIR, "state"))
-RECS_JSONL = os.path.join(STATE_DIR, "recommendations.jsonl")
-SCORECARD_CSV = os.path.join(STATE_DIR, "scorecard.csv")
-BASELINE_JSON = os.path.join(STATE_DIR, "baseline_plan.json")
-LAST_RUN_JSON = os.path.join(STATE_DIR, "last_run.json")   # structured continuity. NOT prose.
+# SKILL_DIR is derived from this file so a copied tree never writes into the live skill.
+SKILL_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# US_ADVISOR_STATE redirects ALL state (tests, dry runs). Resolved once at import time.
+STATE_DIR = os.environ.get("US_ADVISOR_STATE") or os.path.join(SKILL_DIR, "state")
+LEDGER_JSONL = os.path.join(STATE_DIR, "ledger.jsonl")
+LEDGER_LOCK = os.path.join(STATE_DIR, "ledger.lock")
+RUNS_DIR = os.path.join(STATE_DIR, "run")
+TRIGGERS_JSON = os.path.join(STATE_DIR, "triggers.json")
+REPORTS_DIR = os.path.expanduser("~/.claude/us-stock-advisor/reports")  # outside the skills git repo
+SLACK_DM_USER = "U0AD7V4SWD9"          # the only delivery destination; top-level thread only
 
-# universe the satellite may draw from (script-enforced; the LLM may not add tickers)
-SATELLITE_UNIVERSE = [
-    "NVDA", "GOOGL", "MSFT", "META", "AMZN", "AAPL", "AMD", "TSM", "AVGO",
-    "MU", "PLTR", "SOXX", "SMH",
-]
-# NOTE: no commodity/energy sleeve. v4's Agent 2 universe (FCX/XLE/XOM/CVX/SCCO)
-# produced 43% of rejections and ~zero net return minus costs. Deleted.
+
+def run_dir(run_id: str) -> str:
+    """state/run/<run_id>/ — every agent output and every P4 artifact of one run."""
+    return os.path.join(RUNS_DIR, run_id)
+
+
+# ---------------------------------------------------------------- universe
+BENCHMARK = "QQQ"
+CORE_TICKERS = ("QQQ", "QQQM")        # one position; order = whole-share tie-break
+DERISK_TICKER = "SGOV"
+RESIDUAL_FILLER = "SPYM"              # residual cash > CASH_MAX_PCT and no QQQM lot fits
+UNIVERSE = {
+    "core":   ("QQQ", "QQQM"),
+    "broad":  ("SPYM",),
+    "sector": ("SOXQ", "XLK", "IGV", "SMH", "SOXX"),
+    "name":   ("NVDA", "GOOGL", "MSFT", "META", "AMZN", "AAPL", "AVGO", "TSM", "PLTR", "AMD", "MU"),
+    "derisk": ("SGOV",),
+}
+ALL_TICKERS = tuple(t for g in UNIVERSE.values() for t in g)
+SLEEVE_ELIGIBLE = UNIVERSE["broad"] + UNIVERSE["sector"] + UNIVERSE["name"]
+BANNED_NOTE = ("leveraged/inverse ETFs, options, shorts, commodities/energy, GLD: not in "
+               "UNIVERSE and never added by an agent; a non-UNIVERSE ticker is dropped to core")
+# Nasdaq-100 top weights for the INDEX_EARNINGS_SHOCK rule. Refresh by hand quarterly.
+NDX_TOP10 = ("NVDA", "MSFT", "AAPL", "AMZN", "AVGO", "META", "GOOGL", "GOOG", "TSLA", "NFLX", "COST")
+
+
+def group_of(ticker: str) -> str | None:
+    for g, ts in UNIVERSE.items():
+        if ticker in ts:
+            return g
+    return None
+
+
+# ---------------------------------------------------------------- sleeves (user-overridden)
+SLEEVE_MAX_PCT = 0.50                 # spec 0.35
+SLEEVE_POSITION_MAX_PCT = 0.25        # spec 0.20; at entry; also the lot-feasibility bar
+SLEEVE_MAX_POSITIONS = 3              # spec 2
+SLEEVE_TRIM_ABOVE_PCT = 0.35          # spec 0.30; trim a held sleeve name back to POSITION_MAX
+SGOV_MAX_UP = 0.30                    # spec 0.20; regime UP needs 3/3
+SGOV_MAX_DOWN = 0.60                  # spec 0.50; regime DOWN needs 2/3 (equity floor 40%)
+SGOV_EXPIRY_RUNS = 4                  # SGOV survives at most this many weekly runs without a renewing vote
+CASH_MAX_PCT = 0.10                   # cash is a residual, never a target
+MIN_HOLD_SESSIONS = 20                # EXIT needs 3/3 before, 2/3 after
+MAX_ORDER_LINES = 4
+PRICE_BUFFER_PCT = 0.01               # a share fits iff px*(1+this) <= budget (fees/FX/gap)
+WEIGHT_SUM_TOLERANCE = 0.02           # |sum(target_weights) - 1| above this -> renormalise + log
+VOTES_REQUIRED_SLEEVE = 2
+VOTES_REQUIRED_SGOV_UP = 3
+VOTES_REQUIRED_SGOV_DOWN = 2
+VOTES_REQUIRED_EXIT_AFTER_HOLD = 2
+VOTES_REQUIRED_EXIT_WITHIN_HOLD = 3
+VOTES_REQUIRED_KILL_OVERRIDE = 3      # re-affirm a kill-fired name only with 3/3 + new kill
+HORIZON_WEEKS_MIN = 2
+HORIZON_WEEKS_MAX = 26
+
+# ---------------------------------------------------------------- regime (input only)
+REGIME_SMA_MONTHS = 10                # monthly closes, completed months only
+REGIME_SMA_DAYS = 200
+REGIME_UP = "UP"
+REGIME_DOWN = "DOWN"
+HISTORY_PERIOD = "2y"                 # >= 13 completed months for the 10-month SMA
+
+# ---------------------------------------------------------------- research freshness
+CATALYST_MAX_AGE_DAYS = 7
+NEW_FLAG_HOURS = 72
+BACKGROUND_MAX_AGE_DAYS = 45
+CANDIDATE_MENU_MAX = 6
+# Session counts (earnings_in_sessions, sessions_held) use numpy.busday_count: weekends only,
+# US holidays ignored, so they can overcount by 1-2 sessions. Accepted.
+EARNINGS_MENU_SESSIONS = 10           # a name with earnings inside this window enters the menu
+RS_RANK_FLAG_MAX = 3                  # RELATIVE_STRENGTH / SECTOR_MOMENTUM need rs_rank <= this
+EVENT_TYPES = ("GUIDANCE", "EARNINGS", "ANALYST_T1", "REGULATORY_EXPORT", "CONTRACT_PRODUCT",
+               "MA", "CAPEX", "MACRO_PRINT", "POLICY_ENACTED", "SHOCK_MOVE")
+MATERIALITY = ("HIGH", "MED", "LOW")
+DIRECTIONS = ("+", "-", "mixed")
+AGE_TAGS = ("NEW", "RECENT", "BACKGROUND")
+SCOUT_IDS = ("S1_CORE", "S2_CANDIDATES", "S3_MACRO", "S4_REDFLAGS")
+DECIDER_IDS = ("D1_TREND", "D2_FUNDAMENTAL", "D3_MACRO")
+
+# ---------------------------------------------------------------- reason codes (closed enum)
+ENTRY_CODES = ("EARNINGS_BEAT_RAISE", "GUIDANCE_RAISE", "ESTIMATE_REVISION_UP", "CONTRACT_PRODUCT",
+               "REGULATORY_RELIEF", "RELATIVE_STRENGTH", "SECTOR_MOMENTUM")
+EXIT_CODES = ("THESIS_BROKEN", "BETTER_USE", "HORIZON_REACHED", "CAP_DRIFT")
+DERISK_CODES = ("TREND_BREAK", "INDEX_EARNINGS_SHOCK", "POLICY_SHOCK_ENACTED", "CREDIT_EVENT")
+REASON_CODES = {"ENTER": ENTRY_CODES, "HOLD": ENTRY_CODES, "EXIT": EXIT_CODES, "DERISK": DERISK_CODES}
+EVIDENCE_REQUIRED_CODES = ("EARNINGS_BEAT_RAISE", "GUIDANCE_RAISE", "ESTIMATE_REVISION_UP",
+                           "CONTRACT_PRODUCT", "REGULATORY_RELIEF", "THESIS_BROKEN",
+                           "INDEX_EARNINGS_SHOCK", "POLICY_SHOCK_ENACTED", "CREDIT_EVENT")
+RS_FLAG_CODES = ("RELATIVE_STRENGTH", "SECTOR_MOMENTUM")
+# DERISK code -> evidence predicate (every key must match one cited E-ID; entity_in -> NDX_TOP10)
+DERISK_EVIDENCE_RULES = {
+    "TREND_BREAK": {"regime": REGIME_DOWN},
+    "INDEX_EARNINGS_SHOCK": {"event_type": "GUIDANCE", "materiality": "HIGH", "direction": "-",
+                             "entity_in": "NDX_TOP10", "verified_by_fetch": True},
+    "POLICY_SHOCK_ENACTED": {"event_type": "POLICY_ENACTED", "verified_by_fetch": True},
+    "CREDIT_EVENT": {"verified_by_fetch": True},
+}
+NOT_CODES_NOTE = ("overbought/RSI, resistance, 'ahead of FOMC/CPI/earnings', valuation, uncertainty, "
+                  "VIX, positioning, 'wait for pullback' are NOT codes: such a line is dropped to core")
+KILL_TYPES = ("PRICE_BELOW", "DATE", "EVENT", "RS_RANK_BELOW")
+THESIS_MAX_WORDS = 30
+DISSENT_MAX_WORDS = 60
+
+# ---------------------------------------------------------------- watchdog / events
+SHOCK_MOVE_PCT = 0.07                 # one-session |move| on a held name (QQQ included)
+EARNINGS_WARN_SESSIONS = 2            # earnings D-2 on a held sleeve name
+MAX_DATA_AGE_HOURS = 96
+WATCHDOG_ONCALENDAR = "*-*-* 07:30:00 Asia/Seoul"
+SYSTEMD_UNIT = "us-advisor-watchdog"
+WEEKLY_RUN_DOW_KST = 5                # Saturday (Mon=0)
+WEEKLY_RUN_HOUR_KST = 8
+
+# ---------------------------------------------------------------- damage caps (as spec)
+T1_PP = -3.0
+T1_WEEKS = 12
+T1_SLEEVE_CUT = 0.15
+T1_DURATION_WEEKS = 8
+T2_PP = -5.0
+T2_WEEKS = 26
+T4_CASH_WEEKS = 2
+T5_UNFILLED_RUNS = 2
+NOOP_FLAG_WEEKS = 6
+TRAILING_12W_DAYS = 84
+TRAILING_26W_DAYS = 182
+BRIER_MIN_N = 20                      # logged always, displayed only at n >= this
+BRIER_HORIZON_SESSIONS = 20
+FLOW_WARN_USD = 5.0                   # |reported cash - explained cash| above this -> declare a flow
+
+# ---------------------------------------------------------------- costs (KIS)
+FX_SPREAD_PCT = 0.001
+COMMISSION_PCT = 0.0007               # charged to shadow and paper books on every trade
+CGT_ALLOWANCE_KRW = 2_500_000
+
+# ---------------------------------------------------------------- epoch / ledger
+EPOCH_START = None                    # set by the ledger 'epoch' line on the first --mark; never hardcode
+LEDGER_TYPES = ("epoch", "mark", "flow", "order", "fill", "decision", "vote", "trigger")
+TRIGGER_KINDS = ("T1", "T2", "T4", "T5", "NOOP", "KILL_PRICE", "KILL_DATE", "KILL_EVENT", "KILL_RS",
+                 "REGIME_FLIP", "SHOCK_MOVE", "EARNINGS_D2", "SGOV_EXPIRY", "HORIZON", "STALE_DATA")
+
+# ---------------------------------------------------------------- report
+NARRATIVE_MAX_CHARS = 2500
+SLACK_MAX_MESSAGES = 2
+HONESTY_LINE_KO = ("표본 {weeks}주 — 실력 판정 불가. T1/T2는 손실 상한(damage cap)이며 "
+                   "실력 검증이 아님(12주 추적오차 σ≈3.5%p, T1은 소음만으로도 약 20% 확률로 발동).")

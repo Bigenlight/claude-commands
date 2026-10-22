@@ -1,0 +1,5 @@
+{"decider_id":"D1_TREND","regime_seen":"UP",
+ "target_weights":{"CORE":0.8,"SGOV":0.2},
+ "positions":[],
+ "derisk":{"sgov_weight":0.2,"reason_code":"INDEX_EARNINGS_SHOCK","evidence_ids":["E3"]},
+ "p_qqq_up_20d":0.4,"dissent_note":"[mock] Verified guidance cut at a top-10 NDX weight (E3)."}

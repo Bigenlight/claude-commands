@@ -1,0 +1,5 @@
+{"decider_id":"D3_MACRO","regime_seen":"UP",
+ "target_weights":{"CORE":1.0,"SGOV":0.0},
+ "positions":[],
+ "derisk":{"sgov_weight":0.0,"reason_code":null,"evidence_ids":[]},
+ "p_qqq_up_20d":0.55,"dissent_note":"[mock] NVDA is already a top core weight; adding it raises concentration ahead of CPI."}

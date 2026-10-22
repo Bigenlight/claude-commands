@@ -24,3 +24,6 @@ vocab-quiz/results.json
 
 # us-stock-advisor 런타임 상태 (실제 계좌 잔고/보유내역 + 결정 원장 — 개인 금융정보, 코드 아님)
 us-stock-advisor/state/
+
+# claude.ai에서 동기화되는 Anthropic 기본 스킬 (Claude Code 런타임 산출물 — 내 스킬 아님)
+synced/

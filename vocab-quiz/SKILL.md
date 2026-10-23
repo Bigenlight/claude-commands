@@ -70,7 +70,7 @@ description: 영어 단어/개념 단어장(markdown)을 로컬 웹 퀴즈로 �
   quiz-batch: 12        # 한 판에 랜덤 12개만 출제 (0/없음 = 전체). 끝나면 '🔀 한 판 더' 버튼
   quiz-graduate: false  # 연속 ✅여도 💯 안 붙이고 계속 출제
   ```
-  예: 그리스 문자 덱(`greek-symbols-dl.md`)이 이 설정 씀
+  예: 그리스 문자 덱(`greek-symbols-dl.md`)이 이 설정 씀 ← 이 노트는 formula-quiz도 "기호 연습"으로 읽고 같은 아이콘 줄에 기록함 (블록 regex·아이콘 줄 형식 바꾸면 formula-quiz `server.py`의 `V_BLOCK_RE`·`apply_symbol_results`도 같이)
 - **포트 변경**: `VOCAB_PORT=8770 python3 server.py <md>`
 - **기존 단어장 마이그레이션**(예전에 `<summary>` 안에 아이콘이 들어가 있던 경우 → 블록 아래로 이동):
   ```bash

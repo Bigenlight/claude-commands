@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>수식 퀴즈</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="/annotate.js"></script>
+<style>
+  :root{
+    --bg:#f3f1ec; --card:#ffffff; --ink:#1f2430; --muted:#6b7280; --line:#e6e2d9;
+    --accent:#3b5bdb; --accent-ink:#ffffff; --accent-soft:#e8edff;
+    --hint-bg:#fff8e1; --hint-line:#f1c94a; --hint-ink:#5c4a00;
+    --right:#2f9e44; --wrong:#e03131; --stop:#868e96;
+    --formula-bg:#fbfaf7; --code-bg:#f1efe9; --arrow:#d9480f;
+    --shadow:0 10px 30px rgba(30,30,50,.08);
+    --s0:#1c7ed6; --s1:#e8590c; --s2:#2b8a3e; --s3:#ae3ec9; --s4:#0c8599; --s5:#c92a2a; --s6:#a56a00; --s7:#d6336c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#15171c; --card:#1e2128; --ink:#e7e9ee; --muted:#9aa1ad; --line:#2e323b;
+      --accent:#7c93ff; --accent-ink:#0d1020; --accent-soft:#252c47;
+      --hint-bg:#2b2615; --hint-line:#b8962a; --hint-ink:#f0dc9a;
+      --right:#51cf66; --wrong:#ff6b6b; --stop:#8b929c;
+      --formula-bg:#191b21; --code-bg:#262a33; --arrow:#ff8a4c;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --s0:#74c0fc; --s1:#ffa94d; --s2:#69db7c; --s3:#e599f7; --s4:#66d9e8; --s5:#ff8787; --s6:#ffd43b; --s7:#faa2c1;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#15171c; --card:#1e2128; --ink:#e7e9ee; --muted:#9aa1ad; --line:#2e323b;
+    --accent:#7c93ff; --accent-ink:#0d1020; --accent-soft:#252c47;
+    --hint-bg:#2b2615; --hint-line:#b8962a; --hint-ink:#f0dc9a;
+    --right:#51cf66; --wrong:#ff6b6b; --stop:#8b929c;
+    --formula-bg:#191b21; --code-bg:#262a33; --arrow:#ff8a4c;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+    --s0:#74c0fc; --s1:#ffa94d; --s2:#69db7c; --s3:#e599f7; --s4:#66d9e8; --s5:#ff8787; --s6:#ffd43b; --s7:#faa2c1;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,"Segoe UI","Noto Sans KR","Apple SD Gothic Neo",Roboto,sans-serif;
+    line-height:1.65; padding:20px 16px 40px;
+  }
+  .wrap{max-width:880px; margin:0 auto}
+  header{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap}
+  header h1{margin:0; font-size:20px; letter-spacing:-.3px}
+  header .sub{color:var(--muted); font-size:13px}
+  button{font-family:inherit; cursor:pointer; border:0; border-radius:12px; font-weight:700; font-size:15px; padding:13px 16px; transition:filter .15s, transform .06s}
+  button:active{transform:scale(.98)}
+  button:hover{filter:brightness(1.07)}
+  .btn-primary{background:var(--accent); color:var(--accent-ink)}
+  .btn-right{background:var(--right); color:#fff}
+  .btn-wrong{background:var(--wrong); color:#fff}
+  .btn-stop{background:transparent; color:var(--muted); border:1.5px solid var(--line)}
+  .btn-stop.armed{color:var(--wrong); border-color:var(--wrong)}
+  kbd{font-family:ui-monospace,Menlo,monospace; font-size:11px; opacity:.75; margin-left:6px; font-weight:600}
+
+  /* 모집단 선택 */
+  .group{margin:22px 0 8px; font-size:13px; font-weight:800; color:var(--muted); letter-spacing:.5px}
+  .pops{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px}
+  .pop{background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:14px 15px; cursor:pointer; box-shadow:var(--shadow); transition:border-color .15s}
+  .pop:hover{border-color:var(--accent)}
+  .pop.sel{border-color:var(--accent); outline:3px solid var(--accent-soft)}
+  .pop.done{opacity:.55}
+  .pop .name{font-weight:700; font-size:15px; line-height:1.4}
+  .pop .chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; font-size:12px; color:var(--muted)}
+  .pop .chips span{background:var(--code-bg); padding:2px 8px; border-radius:99px}
+  .pop .when{font-size:12px; color:var(--muted); margin-top:6px}
+  .badge{display:inline-block; font-size:11px; font-weight:800; padding:2px 8px; border-radius:99px; background:var(--accent); color:var(--accent-ink); margin-left:6px; vertical-align:2px}
+  .startbar{position:sticky; bottom:0; margin-top:18px; padding:12px 0; background:linear-gradient(to top,var(--bg) 70%,transparent); display:flex; gap:10px; align-items:center}
+  .startbar .info{flex:1; font-size:14px; color:var(--muted)}
+
+  /* 카드 */
+  .progress{display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:13px; color:var(--muted)}
+  .dots{display:flex; gap:5px}
+  .dots i{width:9px; height:9px; border-radius:50%; background:var(--line); display:block}
+  .dots i.cur{background:var(--accent)} .dots i.r{background:var(--right)} .dots i.w{background:var(--wrong)}
+  .card{background:var(--card); border-radius:18px; padding:22px 22px 18px; box-shadow:var(--shadow); border:1px solid var(--line)}
+  .hist{font-size:12px; color:var(--muted); margin-bottom:10px}
+  .hint{background:var(--hint-bg); border-left:4px solid var(--hint-line); color:var(--hint-ink); border-radius:10px; padding:11px 14px; font-size:15px}
+  .hint b{margin-right:4px}
+  .formula{position:relative; background:var(--formula-bg); border:1px solid var(--line); border-radius:14px; padding:18px 14px; margin:14px 0; overflow-x:auto; font-size:1.18em}
+  .formula .katex-display{margin:.4em 0}
+  .formula.symq{font-size:2.5em; padding:22px 14px; text-align:center}   /* 기호 연습: 글자 하나라 크게 */
+  .answer sub{font-size:.8em; color:var(--muted); vertical-align:baseline; margin-left:4px}
+
+  /* 화살표 주석 (정답 공개 후) */
+  .anno{position:relative; width:max-content; min-width:100%}
+  .anno-svg{position:absolute; left:0; top:0; pointer-events:none; overflow:visible}
+  .sym{color:var(--sc); transition:background .12s}
+  .sym.hl{background:color-mix(in srgb, var(--sc) 20%, transparent); border-radius:4px; box-shadow:0 0 0 2px color-mix(in srgb, var(--sc) 20%, transparent)}
+  .alabel{position:absolute; white-space:nowrap; font-size:12.5px; font-weight:650; line-height:1.4; padding:1px 7px; border-radius:7px;
+    color:var(--sc); background:var(--formula-bg); border:1px solid color-mix(in srgb, var(--sc) 40%, transparent); cursor:default;
+    max-width:240px; overflow:hidden; text-overflow:ellipsis; transition:box-shadow .12s, opacity .15s}
+  .alabel .katex{font-size:1.02em}
+  .alabel.hl{box-shadow:0 0 0 2px color-mix(in srgb, var(--sc) 45%, transparent); z-index:2}
+  .anno.dim .alabel:not(.hl), .anno.dim .apath:not(.hl){opacity:.28}
+  .apath{transition:opacity .15s}
+  .anno.nolabels .alabel, .anno.nolabels .anno-svg{display:none}
+  .annobar{display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:11.5px; color:var(--muted); margin-top:6px; font-family:-apple-system,"Segoe UI","Noto Sans KR",sans-serif}
+  .annobar button{font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--code-bg); color:var(--muted)}
+  .atip{position:fixed; z-index:50; max-width:min(420px, calc(100vw - 24px)); background:var(--card); color:var(--ink); border:1.5px solid var(--sc);
+    border-radius:11px; padding:8px 11px; font-size:14px; line-height:1.55; box-shadow:var(--shadow); pointer-events:none}
+  .atip::after{content:""; position:absolute; left:var(--ax, 50%); width:10px; height:10px; background:var(--card); transform:translateX(-50%) rotate(45deg)}
+  .atip.up::after{bottom:-6.5px; border-right:1.5px solid var(--sc); border-bottom:1.5px solid var(--sc)}
+  .atip.down::after{top:-6.5px; border-left:1.5px solid var(--sc); border-top:1.5px solid var(--sc)}
+  .atip .sy{color:var(--sc); font-weight:800; margin-right:4px}
+  .answer li.symli{border-radius:6px; transition:background .12s}
+  .answer li.symli::marker{color:var(--sc); font-size:1.15em}
+  .answer li.symli > .katex:first-child, .answer li.symli > span.katex:first-of-type{color:var(--sc)}
+  .answer li.symli.hl{background:color-mix(in srgb, var(--sc) 13%, transparent)}
+  .title{font-size:21px; font-weight:800; margin:4px 0 10px; letter-spacing:-.3px; display:none}
+  .title.show{display:block; animation:fade .25s ease}
+  .title small{display:block; font-size:12px; font-weight:700; color:var(--accent); letter-spacing:1px}
+  textarea{width:100%; min-height:54px; resize:vertical; border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; font-family:inherit; font-size:14px; line-height:1.5; background:var(--formula-bg); color:var(--ink); outline:none}
+  textarea:focus{border-color:var(--accent)}
+  .lbl{font-size:12px; font-weight:800; color:var(--muted); margin:14px 0 6px; letter-spacing:.5px}
+  .fbtoggle{margin-top:16px; font-size:12.5px; font-weight:700; padding:6px 12px; border-radius:99px; background:var(--code-bg); color:var(--muted)}
+  .answer{display:none; margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); font-size:15.5px}
+  .answer.show{display:block; animation:fade .3s ease}
+  .answer p{margin:.55em 0}
+  .answer ul,.answer ol{padding-left:1.3em; margin:.4em 0}
+  .answer li{margin:.28em 0}
+  .answer strong{font-weight:800}
+  .answer > p > strong:first-child{color:var(--accent)}
+  .answer blockquote{margin:.6em 0; padding:.4em .9em; border-left:3px solid var(--line); color:var(--muted)}
+  .answer code{background:var(--code-bg); padding:1px 5px; border-radius:5px; font-size:.9em}
+  .answer pre{background:var(--code-bg); padding:10px 12px; border-radius:10px; overflow-x:auto}
+  .answer pre code{background:none; padding:0}
+  .answer a{color:var(--accent); font-weight:600; text-decoration:none}
+  .answer a:hover{text-decoration:underline}
+  .answer table{border-collapse:collapse; margin:.6em 0; font-size:14px}
+  .answer th,.answer td{border:1px solid var(--line); padding:5px 9px}
+  .mblock{overflow-x:auto; padding:2px 0}
+  .arr{color:var(--arrow); font-weight:700}
+  .actions{position:sticky; bottom:0; display:flex; gap:10px; padding:14px 0 4px; margin-top:14px; background:linear-gradient(to top,var(--card) 75%,transparent)}
+  .actions button{flex:1}
+  .actions .btn-stop{flex:0 0 auto}
+  .tiny{text-align:center; font-size:12px; color:var(--muted); margin-top:8px}
+  @keyframes fade{from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:none}}
+
+  /* 결과 */
+  .done-card{background:var(--card); border-radius:18px; padding:26px 22px; box-shadow:var(--shadow); border:1px solid var(--line)}
+  .done-card h2{margin:0 0 4px}
+  .scores{display:flex; gap:10px; margin:18px 0}
+  .score{flex:1; background:var(--formula-bg); border:1px solid var(--line); border-radius:14px; padding:12px; text-align:center}
+  .score .n{font-size:28px; font-weight:800}
+  .score .l{font-size:12px; color:var(--muted)}
+  .score.r .n{color:var(--right)} .score.w .n{color:var(--wrong)} .score.s .n{color:var(--stop)}
+  .rlist{list-style:none; padding:0; margin:0}
+  .rlist li{padding:8px 2px; border-bottom:1px solid var(--line); font-size:14.5px}
+  .rlist li:last-child{border-bottom:0}
+  .msg{font-size:14px; color:var(--muted); margin-top:14px}
+  .empty{color:var(--muted); padding:30px 0; text-align:center}
+  @media (max-width:560px){
+    .card{padding:18px 14px 14px}
+    .actions{flex-wrap:wrap}
+    .actions .btn-stop{flex:1 0 100%}
+    .formula{font-size:1.02em}
+    .formula.symq{font-size:2em}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧮 수식 퀴즈</h1>
+    <span class="sub" id="sub">수식 + 힌트 → 머릿속으로 해석 → 정답 확인 → 채점</span>
+  </header>
+  <div id="stage"><div class="empty">불러오는 중…</div></div>
+</div>
+
+<script>
+// check_katex.mjs의 MATH_RE와 동일하게 유지할 것
+const MATH_RE = /^([ \t]*)```math[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```[ \t]*$|(```[\s\S]*?```|`[^`\n]+`)|\$\$([\s\S]+?)\$\$|(?<![\\$])\$(?![\s$])((?:\\\$|[^$\n])+?)(?<![\s\\])\$(?!\d)/gm;
+const stage = document.getElementById('stage');
+const sub = document.getElementById('sub');
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function tex(s, display){
+  try{ return katex.renderToString(s, {displayMode:display, throwOnError:false, strict:'ignore', trust:false}); }
+  catch(e){ return `<code>${esc(s)}</code>`; }
+}
+
+// markdown + 수식 → HTML. 수식은 placeholder로 빼두고 marked 돌린 뒤 KaTeX로 복원
+function md(src, inline=false){
+  const store = [];
+  const body = src.replace(MATH_RE, (m, indent, fence, code, dd, inl) => {
+    if(code !== undefined) return m;
+    let t, display;
+    if(fence !== undefined){ t = fence; display = true; }
+    else if(dd !== undefined){ t = dd; display = true; }
+    else { t = inl; display = false; }
+    store.push({t, display});
+    const ph = `KXPH${store.length-1}END`;
+    return fence !== undefined ? (indent || '') + ph : ph;
+  });
+  let html;
+  try{ html = inline ? marked.parseInline(body) : marked.parse(body); }
+  catch(e){ html = esc(body).replace(/\n/g,'<br>'); }
+  html = html.replace(/←/g, '<span class="arr">←</span>');
+  return html.replace(/<p>KXPH(\d+)END<\/p>|KXPH(\d+)END/g, (m, a, b) => {
+    const s = store[+(a ?? b)];
+    const out = tex(s.t, s.display);
+    return a !== undefined ? `<div class="mblock">${out}</div>` : out;
+  });
+}
+
+function ago(d, today){
+  if(!d) return '아직 안 봄';
+  const ms = new Date(today) - new Date(d);
+  const n = Math.round(ms / 86400000);
+  if(n <= 0) return '오늘 봄';
+  if(n === 1) return '어제 봄';
+  return `${n}일 전에 봄`;
+}
+
+// ------------------------------------------------------------ 모집단 선택
+let POPS = null, selected = null;
+
+async function landing(){
+  POPS = await fetch('/api/pops').then(r => r.json());
+  const {pops, recommended, preselect, today, groups} = POPS;
+  if(!pops.length){
+    stage.innerHTML = `<div class="empty">덱이 없음 — 02-areas/formula-deck/ 에 formula-*.md 가 있는지 확인</div>`;
+    return;
+  }
+  selected = (preselect && pops.some(p => p.slug === preselect)) ? preselect : recommended;
+  const order = [...groups, ...new Set(pops.map(p => p.group).filter(g => !groups.includes(g)))];
+  let html = '';
+  for(const g of order){
+    const ps = pops.filter(p => p.group === g);
+    if(!ps.length) continue;
+    html += `<div class="group">${esc(g)}</div><div class="pops">`;
+    for(const p of ps){
+      const rec = p.slug === recommended ? '<span class="badge">추천</span>' : '';
+      const cls = ['pop', p.slug === selected ? 'sel' : '', p.eligible === 0 ? 'done' : ''].join(' ');
+      html += `<div class="${cls}" data-slug="${esc(p.slug)}">
+        <div class="name">${esc(p.population)}${rec}</div>
+        <div class="chips">
+          <span>${p.total}개</span>
+          ${p.random ? `<span>🎲 랜덤 ${p.batch}개씩</span>` : ''}
+          ${p.unseen ? `<span>새 ${p.unseen}</span>` : ''}
+          ${p.wrong ? `<span>❌ ${p.wrong}</span>` : ''}
+          ${p.right ? `<span>✅ ${p.right}</span>` : ''}
+          ${p.mastered ? `<span>💯 ${p.mastered}</span>` : ''}
+          ${p.errors ? `<span title="파싱 에러 카드">⚠️ ${p.errors}</span>` : ''}
+        </div>
+        <div class="when">${!p.last_studied && p.total > p.unseen ? `${p.total - p.unseen}장 풀어봄` : ago(p.last_studied, today)}</div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+  html += `<div class="startbar"><div class="info" id="selinfo"></div>
+    <button class="btn-primary" id="startBtn">시작 →</button></div>`;
+  stage.innerHTML = html;
+  stage.querySelectorAll('.pop').forEach(el => el.onclick = () => {
+    selected = el.dataset.slug;
+    stage.querySelectorAll('.pop').forEach(x => x.classList.toggle('sel', x === el));
+    updateSel();
+  });
+  document.getElementById('startBtn').onclick = () => selected && start(selected);
+  updateSel();
+  const selEl = stage.querySelector('.pop.sel');
+  if(selEl && preselect) selEl.scrollIntoView({block:'center'});
+}
+
+function updateSel(){
+  const p = POPS.pops.find(x => x.slug === selected);
+  const info = document.getElementById('selinfo');
+  if(!p){ info.textContent = '모집단을 골라'; return; }
+  const n = Math.min(p.eligible, p.batch);
+  info.innerHTML = n ? `<b>${esc(p.population)}</b> — 이번에 ${p.random ? '랜덤 ' : ''}${n}개` : `<b>${esc(p.population)}</b> — 전부 💯 졸업`;
+  document.getElementById('startBtn').disabled = !n;
+}
+
+// ------------------------------------------------------------ 세션
+let S = null;   // {slug, population, cards, i, results, guesses, feedback, revealed}
+
+async function start(slug){
+  const d = await fetch('/api/session?pop=' + encodeURIComponent(slug)).then(r => r.json());
+  if(!d.cards || !d.cards.length){
+    stage.innerHTML = `<div class="empty">출제할 카드가 없음 (전부 💯)</div>`;
+    return;
+  }
+  S = {slug, population:d.population, mode:d.mode, cards:d.cards, i:0, results:{}, guesses:{}, feedback:{}, revealed:false};
+  sub.textContent = d.population;
+  renderCard();
+}
+
+function histText(c){
+  const h = c.history || [];
+  if(!h.length) return '처음 보는 카드';
+  const last = h[h.length-1];
+  return `기록 ${h.map(x => x.icon).join('')} · 마지막 ${last.icon}${last.date ? ' ' + last.date : ''}`;
+}
+
+function dots(){
+  return S.cards.map((c, k) => {
+    const r = S.results[c.id];
+    const cls = r === 'right' ? 'r' : r === 'wrong' ? 'w' : (k === S.i ? 'cur' : '');
+    return `<i class="${cls}"></i>`;
+  }).join('');
+}
+
+function renderCard(){
+  hideTip();
+  ANNO = null;   // 이전 카드 주석 DOM은 사라짐 → resize 재배치 대상에서 뺌
+  if(S.i >= S.cards.length) return finish(false);
+  S.revealed = false;
+  const c = S.cards[S.i];
+  stage.innerHTML = `
+    <div class="progress"><span>${S.i+1} / ${S.cards.length}</span><div class="dots">${dots()}</div></div>
+    <div class="card">
+      <div class="hist">${esc(histText(c))}</div>
+      <div class="title" id="title"><small>정답</small>${md(c.title, true)}</div>
+      ${c.hint ? `<div class="hint"><b>💡 힌트</b>${md(c.hint, true)}</div>` : ''}
+      <div class="formula${S.mode === 'symbol' ? ' symq' : ''}" id="formula">${md(c.question)}</div>
+      <div class="answer" id="answer"></div>
+      <div class="actions" id="actions">
+        <button class="btn-primary" id="revealBtn">정답 보기<kbd>Enter</kbd></button>
+        <button class="btn-stop" id="stopBtn">오늘 그만</button>
+      </div>
+    </div>`;
+  document.getElementById('revealBtn').onclick = reveal;
+  armStop();
+  window.scrollTo({top:0});
+}
+
+function reveal(){
+  if(S.revealed) return;
+  S.revealed = true;
+  const c = S.cards[S.i];
+  document.getElementById('title').classList.add('show');
+  const ans = document.getElementById('answer');
+  ans.innerHTML = md(c.answer) + `
+    <button class="fbtoggle" id="fbBtn">✏️ 해설 피드백 남기기</button>
+    <div id="fbArea" hidden>
+      <div class="lbl">✏️ 피드백 — 해설 보강/수정 요청은 여기 적으면 나중에 Claude가 반영</div>
+      <textarea id="fb" placeholder="예: 전개 중간 단계가 너무 점프함 / 기호 설명이 헷갈려 / 힌트가 너무 쉬움"></textarea>
+    </div>`;
+  ans.classList.add('show');
+  document.getElementById('fbBtn').onclick = () => {
+    document.getElementById('fbBtn').hidden = true;
+    document.getElementById('fbArea').hidden = false;
+    document.getElementById('fb').focus();
+  };
+  try{ annotateCard(c); }catch(e){ console.error('[anno]', e); }
+  document.getElementById('actions').innerHTML = `
+    <button class="btn-right" id="rightBtn">✅ 맞췄다<kbd>1</kbd></button>
+    <button class="btn-wrong" id="wrongBtn">❌ 틀렸다<kbd>2</kbd></button>
+    <button class="btn-stop" id="stopBtn">🛑 오늘 그만</button>`;
+  document.getElementById('rightBtn').onclick = () => grade('right');
+  document.getElementById('wrongBtn').onclick = () => grade('wrong');
+  armStop();
+}
+
+function grabFeedback(){
+  const el = document.getElementById('fb');
+  if(el && el.value.trim()) S.feedback[S.cards[S.i].id] = el.value.trim();
+}
+
+function grade(r){
+  hideTip();
+  grabFeedback();
+  S.results[S.cards[S.i].id] = r;
+  S.i++;
+  renderCard();
+}
+
+// 오늘 그만: 실수 방지로 두 번 눌러야 끝남 (브라우저 confirm 대신)
+function armStop(){
+  const b = document.getElementById('stopBtn');
+  let armed = false, timer = null;
+  b.onclick = () => {
+    if(!armed){
+      armed = true; b.classList.add('armed'); b.textContent = '한 번 더 누르면 종료';
+      timer = setTimeout(() => { armed = false; b.classList.remove('armed'); b.textContent = S.revealed ? '🛑 오늘 그만' : '오늘 그만'; }, 3000);
+      return;
+    }
+    clearTimeout(timer);
+    grabFeedback();
+    finish(true);
+  };
+}
+
+async function finish(stopped){
+  const shown = S.cards.slice(0, Math.min(S.i + (S.revealed && stopped ? 1 : 0), S.cards.length)).map(c => c.id);
+  const ids = Object.keys(S.results);
+  const nr = ids.filter(k => S.results[k] === 'right').length;
+  const nw = ids.filter(k => S.results[k] === 'wrong').length;
+  const ns = S.cards.length - nr - nw;
+  const fbN = Object.keys(S.feedback).length;
+  const items = S.cards.map(c => {
+    const r = S.results[c.id];
+    const icon = r === 'right' ? '✅' : r === 'wrong' ? '❌' : '⏸️';
+    return `<li>${icon} ${md(c.title, true)}</li>`;
+  }).join('');
+  stage.innerHTML = `
+    <div class="done-card">
+      <h2>${stopped ? '🛑 오늘은 여기까지' : '🎉 이번 세션 끝'}</h2>
+      <div class="hist">${esc(S.population)}</div>
+      <div class="scores">
+        <div class="score r"><div class="n">${nr}</div><div class="l">✅ 맞춤</div></div>
+        <div class="score w"><div class="n">${nw}</div><div class="l">❌ 틀림</div></div>
+        <div class="score s"><div class="n">${ns}</div><div class="l">⏸️ 다음에</div></div>
+      </div>
+      <ul class="rlist">${items}</ul>
+      <div class="msg" id="msg">저장 중…</div>
+    </div>`;
+  const msg = document.getElementById('msg');
+  try{
+    let j;
+    if(ids.length || fbN){
+      j = await fetch('/api/save', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({pop:S.slug, results:S.results, guesses:S.guesses, feedback:S.feedback, shown, stopped_early:stopped})}).then(r => r.json());
+    } else {
+      j = await fetch('/api/quit', {method:'POST'}).then(r => r.json());
+    }
+    let t = ids.length ? `✅ 덱 md에 기록 ${ids.length}건 저장함.` : '채점한 카드가 없어서 기록 없이 끝냄.';
+    if(fbN) t += `<br>✏️ 피드백 <b>${fbN}개</b> 저장 → 채팅에서 "피드백 반영해줘" 하면 Claude가 해설 고쳐줌.`;
+    if(!j.keep_alive) t += '<br>서버는 내려갔으니 이 창은 닫아도 됨.';
+    msg.innerHTML = t;
+  }catch(e){
+    msg.textContent = '⚠️ 저장 실패: ' + e;
+  }
+  S.done = true;
+}
+
+// ------------------------------------------------------------ 키보드
+document.addEventListener('keydown', e => {
+  if(!S || S.done) return;
+  const typing = ['TEXTAREA','INPUT'].includes(document.activeElement.tagName);
+  if(!S.revealed){
+    if(e.key === 'Enter' && !typing){ e.preventDefault(); reveal(); }
+    return;
+  }
+  if(typing) return;
+  if(e.key === '1') grade('right');
+  else if(e.key === '2') grade('wrong');
+  else if(e.key === 'l' || e.key === 'L') toggleLabels();
+});
+
+// ------------------------------------------------------------ 화살표 주석
+// 정답 공개 시 문제 수식을 다시 렌더: 기호 풀이 bullet의 기호를 색칠 + 위/아래 라벨과 화살표.
+// 라벨 자리가 모자란 기호는 색칠만 하고 마우스 올리면 설명 말풍선.
+const NPAL = 8;
+let ANNO = null;   // {annos, color: Map(k → palette idx), wrap}
+let labelsOn = true;
+try{ labelsOn = localStorage.getItem('fq-labels') !== 'off'; }catch(e){}
+
+function texTrusted(s){
+  return katex.renderToString(s, {displayMode:true, throwOnError:true, strict:'ignore', trust: x => x.command === '\\htmlData'});
+}
+
+function annotateCard(c){
+  ANNO = null;
+  const box = document.getElementById('formula');
+  const fm = /^[ \t]*```math[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```[ \t]*$/m.exec(c.question);
+  if(!fm || typeof FormulaAnnotate === 'undefined') return;
+  const bullets = FormulaAnnotate.parseBullets(c.answer);
+  if(!bullets.length) return;
+  const ok = t => { try{ texTrusted(t); return true; }catch(e){ return false; } };
+  const res = FormulaAnnotate.annotate(fm[1], bullets, ok);
+  const live = res.annos.filter(a => a.hits);
+  if(!live.length) return;
+  const color = new Map(live.map((a, i) => [a.k, i % NPAL]));
+  // 문제 md의 math 펜스 자리만 주석 버전으로 교체
+  const PH = 'ANNOFENCEPH';
+  let html = md(c.question.replace(fm[0], PH));
+  const block = `<div class="anno" id="anno"><div class="anno-math">${texTrusted(res.tex)}</div><svg class="anno-svg" id="annoSvg"></svg></div>`;
+  html = html.replace(new RegExp(`<p>${PH}</p>|${PH}`), block);
+  box.innerHTML = html + `<div class="annobar"><span>기호에 마우스 올리면 설명 · 아래 기호 풀이 항목에 올리면 수식에서 위치 표시</span>
+    <button id="lblBtn" title="단축키 L">${labelsOn ? '라벨 숨기기' : '라벨 보이기'}</button></div>`;
+  const wrap = document.getElementById('anno');
+  wrap.classList.toggle('nolabels', !labelsOn);
+  document.getElementById('lblBtn').onclick = toggleLabels;
+  wrap.querySelectorAll('[data-sym]').forEach(el => {
+    const k = +el.dataset.sym;
+    el.classList.add('sym');
+    el.style.setProperty('--sc', `var(--s${color.get(k)})`);
+  });
+  ANNO = {annos: res.annos, color, wrap};
+  // 기호 풀이 목록 항목과 연결 (li 순번 = bullet의 li)
+  const strong = [...document.querySelectorAll('#answer p > strong')].find(s => s.textContent.trim() === '기호 풀이');
+  const ul = strong && strong.parentElement.nextElementSibling;
+  if(ul && ul.tagName === 'UL'){
+    const lis = [...ul.children].filter(x => x.tagName === 'LI');
+    for(const a of live){
+      const li = lis[a.li];
+      if(!li) continue;
+      li.classList.add('symli');
+      li.dataset.sym = a.k;
+      li.style.setProperty('--sc', `var(--s${color.get(a.k)})`);
+      li.addEventListener('mouseenter', () => highlight(a.k, true));
+      li.addEventListener('mouseleave', () => highlight(a.k, false));
+    }
+  }
+  // 수식 기호 호버 → 말풍선 + 강조
+  wrap.addEventListener('mouseover', e => {
+    const el = e.target.closest('.anno-math [data-sym]');
+    if(!el || !wrap.contains(el)) return;
+    showTip(+el.dataset.sym, el);
+  });
+  wrap.addEventListener('mouseout', e => {
+    const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.anno-math [data-sym], .alabel');
+    if(to && wrap.contains(to)) return;
+    hideTip();
+  });
+  wrap.addEventListener('click', e => { // 터치: 탭으로 토글
+    const el = e.target.closest('.anno-math [data-sym]');
+    if(el) showTip(+el.dataset.sym, el); else hideTip();
+  });
+  layoutLabels();
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => ANNO && ANNO.wrap === wrap && layoutLabels());
+}
+
+function toggleLabels(){
+  labelsOn = !labelsOn;
+  try{ localStorage.setItem('fq-labels', labelsOn ? 'on' : 'off'); }catch(e){}
+  if(!ANNO) return;
+  ANNO.wrap.classList.toggle('nolabels', !labelsOn);
+  const b = document.getElementById('lblBtn');
+  if(b) b.textContent = labelsOn ? '라벨 숨기기' : '라벨 보이기';
+}
+
+function highlight(k, on){
+  if(!ANNO) return;
+  const sel = `[data-sym="${k}"]`;
+  document.querySelectorAll(`#anno ${sel}, .alabel${sel}, .apath${sel}, li.symli${sel}`).forEach(el => el.classList.toggle('hl', on));
+  ANNO.wrap.classList.toggle('dim', on);
+}
+
+// 요소 + 자손 글리프들의 합집합 사각형 (KaTeX는 위·아래첨자를 relative로 밀어서 부모 rect만으론 부정확)
+function unionRect(el){
+  let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+  const take = r => { if(r.width <= 0 && r.height <= 0) return; L = Math.min(L, r.left); T = Math.min(T, r.top); R = Math.max(R, r.right); B = Math.max(B, r.bottom); };
+  for(const n of [el, ...el.querySelectorAll('*')]){
+    if(n.tagName === 'svg' || n.classList.contains('frac-line') || (n.childElementCount === 0 && n.textContent.trim())) take(n.getBoundingClientRect());
+  }
+  if(L === Infinity) return el.getBoundingClientRect();
+  return {left:L, top:T, right:R, bottom:B, width:R-L, height:B-T};
+}
+
+let tipEl = null, tipK = null;
+function showTip(k, el){
+  if(!ANNO) return;
+  const a = ANNO.annos[k];
+  if(!a) return;
+  if(tipK !== k){ hideTip(); highlight(k, true); tipK = k; }
+  if(!tipEl){ tipEl = document.createElement('div'); tipEl.className = 'atip'; document.body.appendChild(tipEl); }
+  tipEl.style.setProperty('--sc', `var(--s${ANNO.color.get(k)})`);
+  tipEl.innerHTML = `<span class="sy">${a.pats.map(p => tex(p, false)).join(', ')}</span> <span class="arr">←</span> ${md(a.text, true)}`;
+  const r = unionRect(el);
+  const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+  const cx = (r.left + r.right) / 2;
+  const left = Math.max(10, Math.min(window.innerWidth - tw - 10, cx - tw / 2));
+  const up = r.top - th - 12 > 8;
+  tipEl.className = 'atip ' + (up ? 'up' : 'down');
+  tipEl.style.left = left + 'px';
+  tipEl.style.top = (up ? r.top - th - 10 : r.bottom + 10) + 'px';
+  tipEl.style.setProperty('--ax', Math.max(12, Math.min(tw - 12, cx - left)) + 'px');
+}
+function hideTip(){
+  if(tipK !== null) highlight(tipK, false);
+  tipK = null;
+  if(tipEl){ tipEl.remove(); tipEl = null; }
+}
+window.addEventListener('scroll', hideTip, {passive:true});
+
+// 라벨 배치: 기호마다 위 or 아래 줄(최대 3단)에 겹치지 않게 놓고, 못 놓으면 호버 전용
+function layoutLabels(){
+  if(!ANNO) return;
+  const {wrap, annos, color} = ANNO;
+  const svg = document.getElementById('annoSvg');
+  if(!svg || !wrap.isConnected) return;
+  wrap.querySelectorAll('.alabel').forEach(x => x.remove());
+  svg.innerHTML = '';
+  wrap.style.paddingTop = wrap.style.paddingBottom = '0px';
+  const base = wrap.querySelector('.katex-html');
+  if(!base) return;
+  const rel = r => { const w = wrap.getBoundingClientRect(); return {left:r.left-w.left, right:r.right-w.left, top:r.top-w.top, bottom:r.bottom-w.top, width:r.width, height:r.height}; };
+  let M = rel(base.getBoundingClientRect());
+  const W = wrap.clientWidth;
+  const WIDE = Math.max(30, parseFloat(getComputedStyle(base).fontSize) || 0);   // 이보다 넓은 덩어리는 화살표 대신 대괄호 (기호 연습의 큰 글자 하나는 화살표)
+  const flat = M.height < 34;   // 한 줄짜리 납작한 식이면 위·아래 아무 데나
+  // 화살표 통로 검사: 기호에서 수식 위(아래) 끝까지 수직으로 올라가는(내려가는) 길에 다른 글자가 있으면 그쪽 라벨 X
+  // → 분모 기호는 위로 못 가고, 여러 줄 식의 가운데 줄 기호도 막혀 있으면 호버 전용
+  const glyphs = [...base.querySelectorAll('*')]
+    .filter(n => n.tagName === 'svg' || n.classList.contains('frac-line') || (n.childElementCount === 0 && n.textContent.trim()))
+    .map(n => ({n, r: rel(n.getBoundingClientRect())})).filter(g => g.r.width > 0 && g.r.height > 0);
+  const clear = (el, r, side) => {
+    const wide = r.width > WIDE;
+    const x0 = wide ? r.left + 2 : (r.left + r.right) / 2 - 3, x1 = wide ? r.right - 2 : (r.left + r.right) / 2 + 3;
+    for(const g of glyphs){
+      if(el.contains(g.n)) continue;
+      if(g.r.right <= x0 || g.r.left >= x1) continue;
+      if(side === 'up' ? (g.r.bottom - 3 <= r.top + 1 && g.r.bottom > M.top) : (g.r.top + 3 >= r.bottom - 1 && g.r.top < M.bottom)) return false;
+    }
+    return true;
+  };
+  const MAXT = 3, GAP = 16, PADX = 2;
+  // 기호별 기준 위치: 위 라벨용(첫 줄·분자 쪽 첫 등장) / 아래 라벨용(끝 줄·분모 쪽 첫 등장) 따로
+  const items = [];
+  for(const a of annos){
+    if(!a.hits) continue;
+    const els = [...wrap.querySelectorAll(`.anno-math [data-sym="${a.k}"]`)];
+    const cand = {};
+    for(const el of els){
+      const r = rel(unionRect(el));
+      if(!cand.up && (flat || clear(el, r, 'up'))) cand.up = {el, r};
+      if(!cand.down && (flat || clear(el, r, 'down'))) cand.down = {el, r};
+    }
+    if(!cand.up && !cand.down) continue;
+    const lab = document.createElement('div');
+    lab.className = 'alabel';
+    lab.dataset.sym = a.k;
+    lab.style.setProperty('--sc', `var(--s${color.get(a.k)})`);
+    lab.innerHTML = md(a.label, true);
+    lab.style.visibility = 'hidden';
+    wrap.appendChild(lab);
+    const any = cand.up || cand.down;
+    items.push({a, cand, lab, w: lab.offsetWidth, h: lab.offsetHeight, x0: (any.r.left + any.r.right) / 2});
+  }
+  if(!items.length) return;
+  const H = Math.max(...items.map(i => i.h));
+  const ROW = H + 7;
+  const tiers = {up: Array.from({length:MAXT}, () => []), down: Array.from({length:MAXT}, () => [])};
+  const tryPlace = (it, side) => {
+    const c = it.cand[side];
+    if(!c) return false;
+    const cx = (c.r.left + c.r.right) / 2;
+    const want = Math.max(PADX, Math.min(W - it.w - PADX, cx - it.w / 2));
+    for(let t = 0; t < MAXT; t++){
+      const row = tiers[side][t];
+      const lastR = row.length ? row[row.length-1].right : -Infinity;
+      const left = Math.max(want, lastR + 8);
+      if(left + it.w > W - PADX + 0.5) continue;
+      if(Math.abs(left + it.w / 2 - cx) > it.w / 2 + 64) continue;   // 기호에서 너무 멀어지면 X
+      const lx = Math.max(left + 8, Math.min(left + it.w - 8, cx));
+      // 바깥 단에 놓을 땐 화살표가 안쪽 단 라벨을 뚫고 지나가면 X
+      let cross = false;
+      for(let u = 0; u < t && !cross; u++)
+        for(const o of tiers[side][u]){
+          const lo = Math.min(lx, cx), hi = Math.max(lx, cx);
+          if(hi > o.left - 5 && lo < o.right + 5){ cross = true; break; }
+        }
+      if(cross) continue;
+      Object.assign(it, {side, tier: t, left, lx, cx, el: c.el});
+      row.push({left, right: left + it.w});
+      return true;
+    }
+    return false;
+  };
+  // x 순서대로: 위·아래 둘 다 되면 번갈아 (이웃 라벨끼리 반대편), 자리 없으면 반대편 시도
+  items.sort((p, q) => p.x0 - q.x0);
+  let flip = true;
+  for(const it of items){
+    let pref;
+    if(it.cand.up && it.cand.down){ pref = flip ? 'up' : 'down'; flip = !flip; }
+    else pref = it.cand.up ? 'up' : 'down';
+    if(!tryPlace(it, pref)) tryPlace(it, pref === 'up' ? 'down' : 'up');
+  }
+  const used = side => Math.max(0, ...items.filter(i => i.side === side).map(i => i.tier + 1));
+  const nUp = used('up'), nDown = used('down');
+  wrap.style.paddingTop = nUp ? (GAP + nUp * ROW) + 'px' : '0px';
+  wrap.style.paddingBottom = nDown ? (GAP + nDown * ROW) + 'px' : '0px';
+  // 패딩 넣은 뒤 다시 재서 세로 위치 확정 + 화살표 그리기
+  M = rel(base.getBoundingClientRect());
+  const ns = 'http://www.w3.org/2000/svg';
+  svg.setAttribute('width', wrap.scrollWidth);
+  svg.setAttribute('height', wrap.scrollHeight);
+  for(const it of items){
+    if(it.tier === undefined){ it.lab.remove(); continue; }
+    const r = rel(unionRect(it.el));
+    const up = it.side === 'up';
+    const top = up ? M.top - GAP - (it.tier + 1) * ROW + 7 : M.bottom + GAP + it.tier * ROW;
+    Object.assign(it.lab.style, {left: it.left + 'px', top: top + 'px', visibility: 'visible'});
+    const col = `var(--s${color.get(it.a.k)})`;
+    const y0 = up ? top + it.h : top;                 // 라벨 쪽 끝
+    const wide = r.width > WIDE;
+    const y1 = up ? r.top - (wide ? 5 : 2) : r.bottom + (wide ? 5 : 2);   // 기호 쪽 끝
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'apath');
+    g.dataset.sym = it.a.k;
+    g.style.color = col;
+    const yEdge = up ? Math.min(y1, M.top - 2) : Math.max(y1, M.bottom + 2);   // 수식 경계 (안쪽은 수직선만)
+    const ym = (y0 + yEdge) / 2;
+    let d = `M${it.lx},${y0} C${it.lx},${ym} ${it.cx},${ym} ${it.cx},${yEdge}` + (yEdge !== y1 ? ` L${it.cx},${y1}` : '');
+    let parts = `<path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".85"/>`;
+    if(wide){   // 넓은 덩어리는 대괄호로 범위 표시
+      const yb = up ? r.top - 3 : r.bottom + 3, tk = up ? 4 : -4;
+      parts += `<path d="M${r.left+1},${yb+tk} L${r.left+1},${yb} L${r.right-1},${yb} L${r.right-1},${yb+tk}" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".75"/>`;
+      parts += `<circle cx="${it.cx}" cy="${y1}" r="2" fill="currentColor"/>`;
+    } else {
+      const s = up ? -1 : 1;
+      parts += `<path d="M${it.cx-3.6},${y1 + s*6.5} L${it.cx+3.6},${y1 + s*6.5} L${it.cx},${y1} Z" fill="currentColor"/>`;
+    }
+    g.innerHTML = parts;
+    svg.appendChild(g);
+    it.lab.addEventListener('mouseenter', () => showTip(it.a.k, it.el));
+    it.lab.addEventListener('mouseleave', hideTip);
+  }
+}
+let relayoutT = null;
+window.addEventListener('resize', () => { clearTimeout(relayoutT); relayoutT = setTimeout(() => { hideTip(); layoutLabels(); }, 120); });
+
+if(typeof katex === 'undefined' || typeof marked === 'undefined'){
+  stage.innerHTML = '<div class="empty">⚠️ KaTeX/marked CDN 로드 실패 — 인터넷 연결 확인</div>';
+} else {
+  landing();
+}
+</script>
+</body>
+</html>

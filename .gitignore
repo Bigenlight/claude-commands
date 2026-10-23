@@ -22,6 +22,10 @@ multi-agent-research/REVIEW_v2.md
 vocab-quiz/feedback.json
 vocab-quiz/results.json
 
+# formula-quiz 런타임 산출물 (마지막 세션 결과/피드백 — 코드 아님)
+formula-quiz/feedback.json
+formula-quiz/last_session.json
+
 # us-stock-advisor 런타임 상태 (실제 계좌 잔고/보유내역 + 결정 원장 — 개인 금융정보, 코드 아님)
 us-stock-advisor/state/
 

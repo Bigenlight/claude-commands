@@ -1,6 +1,6 @@
 # Claude Code Skills (Theo's personal collection)
 
-Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 13개 스킬 전부 활성화.
+Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토리. clone 한 방으로 15개 스킬 전부 활성화.
 
 > **2026-05-04 마이그레이션**: 기존 `~/claude-commands/skills/<name>/` → `~/.claude/skills/<name>/` 평탄 구조로 변경. 자세한 내용은 하단 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -21,6 +21,8 @@ Personal Claude Code skills — repo 자체가 곧 `~/.claude/skills/` 디렉토
 | [`/vocab-quiz`](#vocab-quiz) | Manual | `<details>/<summary>` 포맷 단어장을 로컬 웹 퀴즈로 풀고 결과를 md에 아이콘으로 누적 마킹. vocab-collect와 단어장 공유 |
 | [`/recall-quiz`](#recall-quiz) | Manual | 임의 노트 하나로 멀티에이전트가 복습 문제를 생성해 로컬 웹 퀴즈로 풀고, `:repeat:`/`⭐`를 소스 노트 heading에 마킹 + 문제별 라이브 튜터 채팅. warmup/check/recall 3모드 |
 | [`/sleep-log`](#sleep-log) | Manual | 삼성헬스(갤럭시핏3) 수면 스크린샷을 vision 인식해 그날 데일리 노트 잠 블록 + sleep-tracking 기록표에 자동 기록. 일별/주별 판별, 여러 장 병합, idempotent 갱신 |
+| [`/formula-quiz`](#formula-quiz) | Manual | 수식 덱을 로컬 웹 퀴즈로 공부 — 수식 + 힌트로 의미 guess → 정답 공개 시 기호마다 화살표 주석 + 해설 → ✅/❌/🛑. 1회 = 모집단 1개 최대 5개, 그리스 문자 기호 연습(랜덤 5개)도 포함 |
+| [`/formula-collect`](#formula-collect) | Manual | 논문·노트에서 핵심 수식을 멀티에이전트(Sonnet 추출 → Opus 작성 → Opus 검수)로 뽑아 formula-quiz 덱에 카드로 추가. 중복 제외, 모집단 자동 배치 |
 
 ---
 
@@ -34,7 +36,7 @@ git clone git@github.com:Bigenlight/claude-commands.git ~/.claude/skills
 git clone https://github.com/Bigenlight/claude-commands.git ~/.claude/skills
 ```
 
-Restart Claude Code — 13개 스킬 전부 자동 활성화.
+Restart Claude Code — 15개 스킬 전부 자동 활성화.
 
 > 이미 `~/.claude/skills/` 디렉토리가 있으면 먼저 백업하거나 비워야 함. swap 절차는 [legacy 섹션](#이전-구조-legacy) 참고.
 
@@ -249,6 +251,30 @@ PARAZETTEL 연구 vault의 주간 리뷰를 자동 생성. Sonnet 6개로 데이
 ```
 
 **동작**: 스샷 vision 추출(TIB/TST/단계/회복/SpO2 + 한국어 시간포맷 변환) → WAKE date로 데일리 노트 탐색(루트 → 00-inbox → 05-daily → 전역) → 잠 블록 삽입/갱신 + 기록표 날짜순 삽입 → 원본 스샷 `08-assets/<YYYY>/sleep/` 보관. 카페인·음주는 추적 안 함(교란은 낮잠만), 권장 실행 시점은 밤(운동·오후 컨디션 확정 후).
+
+---
+
+## formula-quiz
+
+영단어장(`vocab-quiz`)의 수식 버전. 수식 덱(`02-areas/formula-deck/formula-*.md`, 모집단 1개 = 파일 1개)을 로컬 웹 퀴즈로 띄워서, **수식 + 짧은 힌트**만 보고 의미를 머릿속으로 해석 → 정답 공개(정체·의미·기호 풀이·전개·헷갈리는 점·참고 노트) → ✅ 맞췄다 / ❌ 틀렸다 / 🛑 오늘 그만. 결과는 카드 아래 `기록: ✅날짜 …` 줄에 서버가 결정론적으로 누적(연속 3✅ → 💯 졸업). 정답 공개 시 `annotate.js`가 카드의 **기호 풀이** bullet을 문제 수식과 자동 매칭해 기호마다 색칠 + 위·아래 라벨 화살표 + 호버 말풍선을 그림. **기호 연습**으로 그리스 문자 노트(vocab-quiz 형식, 기록 공유)에서 랜덤 5개 + 다른 덱에서 그 기호가 쓰인 곳 자동 첨부.
+
+```
+/formula-quiz [모집단 이름 일부 (예: flow, attention, bellman)]
+"수식 퀴즈" / "오늘 수식" / "그리스 문자 연습"
+```
+
+**규칙**: 스킬 1회 = 모집단 1개(또는 일부) 최대 5개(`FORMULA_MAX` / frontmatter `quiz-batch`). 출제 우선순위 최근 ❌ → 안 본 카드 → ✅ 오래된 순, 출제 순서는 파일 순서. 저장 후 서버 자동 종료(기본 포트 8766). 유틸: `server.py check|stats|readme`, `check_katex.mjs`(KaTeX 렌더 검사), `check_annotate.mjs`(화살표 매칭 커버리지). 카드 포맷 스펙은 `references/deck_format.md`.
+
+---
+
+## formula-collect
+
+논문(PDF·arXiv URL)이나 vault 노트에서 중요한 수식(모델 구조·loss/objective·update rule·핵심 전개 결과)을 뽑아 `formula-quiz` 덱에 카드로 추가. Sonnet 추출 → 메인 세션 선정·모집단 배치 → Opus 작성 → 다른 Opus 검수(작성자 ≠ 검수자). 기존 모집단에 맞으면 거기에, 아니면 새 모집단 파일 생성, 중복 카드는 제외. 작성 후 `server.py check` + `check_katex.mjs` + `check_annotate.mjs` 자가 검사.
+
+```
+/formula-collect <논문 PDF 경로 | arXiv URL | 노트 경로> [넣을 모집단]
+"이 논문 수식 추가해줘" / "수식 덱에 넣어줘"
+```
 
 ---
 

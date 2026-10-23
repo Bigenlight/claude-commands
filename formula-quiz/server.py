@@ -738,8 +738,8 @@ def main():
     if not os.path.isdir(deck_dir):
         sys.exit(f"덱 폴더 없음: {deck_dir}")
     pre = args["pop"]
-    if pre and not pre.startswith("formula-"):
-        pre = "formula-" + pre
+    if pre and not deck_path(deck_dir, pre) and deck_path(deck_dir, "formula-" + pre):
+        pre = "formula-" + pre   # `--pop flow-matching`처럼 prefix 뺀 것도 OK (기호 노트는 이름 그대로)
     notes = NoteIndex(find_repo_root(deck_dir))
     server_ref = {}
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), make_handler(deck_dir, notes, pre, server_ref))

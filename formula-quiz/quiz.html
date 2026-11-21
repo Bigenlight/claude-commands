@@ -58,6 +58,7 @@
   .btn-wrong{background:var(--wrong); color:#fff}
   .btn-stop{background:transparent; color:var(--muted); border:1.5px solid var(--line)}
   .btn-stop.armed{color:var(--wrong); border-color:var(--wrong)}
+  .btn-back{background:transparent; color:var(--muted); border:1.5px solid var(--line)}
   kbd{font-family:ui-monospace,Menlo,monospace; font-size:11px; opacity:.75; margin-left:6px; font-weight:600}
 
   /* 모집단 선택 */
@@ -140,7 +141,7 @@
   .arr{color:var(--arrow); font-weight:700}
   .actions{position:sticky; bottom:0; display:flex; gap:10px; padding:14px 0 4px; margin-top:14px; background:linear-gradient(to top,var(--card) 75%,transparent)}
   .actions button{flex:1}
-  .actions .btn-stop{flex:0 0 auto}
+  .actions .btn-stop, .actions .btn-back{flex:0 0 auto}
   .tiny{text-align:center; font-size:12px; color:var(--muted); margin-top:8px}
   @keyframes fade{from{opacity:0; transform:translateY(5px)} to{opacity:1; transform:none}}
 
@@ -324,11 +325,13 @@ function renderCard(){
       <div class="formula${S.mode === 'symbol' ? ' symq' : ''}" id="formula">${md(c.question)}</div>
       <div class="answer" id="answer"></div>
       <div class="actions" id="actions">
+        ${S.i > 0 ? '<button class="btn-back" id="backBtn" title="단축키 Backspace">← 이전<kbd>⌫</kbd></button>' : ''}
         <button class="btn-primary" id="revealBtn">정답 보기<kbd>Enter</kbd></button>
         <button class="btn-stop" id="stopBtn">오늘 그만</button>
       </div>
     </div>`;
   document.getElementById('revealBtn').onclick = reveal;
+  armBack();
   armStop();
   window.scrollTo({top:0});
 }
@@ -353,17 +356,21 @@ function reveal(){
   };
   try{ annotateCard(c); }catch(e){ console.error('[anno]', e); }
   document.getElementById('actions').innerHTML = `
+    ${S.i > 0 ? '<button class="btn-back" id="backBtn" title="단축키 Backspace">← 이전<kbd>⌫</kbd></button>' : ''}
     <button class="btn-right" id="rightBtn">✅ 맞췄다<kbd>1</kbd></button>
     <button class="btn-wrong" id="wrongBtn">❌ 틀렸다<kbd>2</kbd></button>
     <button class="btn-stop" id="stopBtn">🛑 오늘 그만</button>`;
   document.getElementById('rightBtn').onclick = () => grade('right');
   document.getElementById('wrongBtn').onclick = () => grade('wrong');
+  armBack();
   armStop();
 }
 
 function grabFeedback(){
   const el = document.getElementById('fb');
-  if(el && el.value.trim()) S.feedback[S.cards[S.i].id] = el.value.trim();
+  if(!el) return;
+  const id = S.cards[S.i].id, v = el.value.trim();
+  if(v) S.feedback[id] = v; else delete S.feedback[id];
 }
 
 function grade(r){
@@ -372,6 +379,27 @@ function grade(r){
   S.results[S.cards[S.i].id] = r;
   S.i++;
   renderCard();
+}
+
+// 이전 문제로: 직전 카드 채점 취소 → 정답 공개 화면으로 복귀 (적어둔 피드백은 다시 채워둠)
+function back(){
+  if(!S || S.done || S.i <= 0) return;
+  hideTip();
+  grabFeedback();
+  S.i--;
+  const id = S.cards[S.i].id;
+  delete S.results[id];
+  renderCard();
+  reveal();
+  if(S.feedback[id]){
+    document.getElementById('fbBtn').hidden = true;
+    document.getElementById('fbArea').hidden = false;
+    document.getElementById('fb').value = S.feedback[id];
+  }
+}
+function armBack(){
+  const b = document.getElementById('backBtn');
+  if(b) b.onclick = back;
 }
 
 // 오늘 그만: 실수 방지로 두 번 눌러야 끝남 (브라우저 confirm 대신)
@@ -437,6 +465,7 @@ async function finish(stopped){
 document.addEventListener('keydown', e => {
   if(!S || S.done) return;
   const typing = ['TEXTAREA','INPUT'].includes(document.activeElement.tagName);
+  if(e.key === 'Backspace' && !typing){ e.preventDefault(); back(); return; }
   if(!S.revealed){
     if(e.key === 'Enter' && !typing){ e.preventDefault(); reveal(); }
     return;

@@ -66,6 +66,9 @@
   .b-right{background:var(--right)}
   .b-wrong{background:var(--wrong)}
   .b-next{background:#6a82fb}
+  .nav{display:flex; justify-content:flex-start; margin-top:10px}
+  .b-back{flex:none; background:none; color:var(--muted); font-size:14px; font-weight:600; padding:6px 4px}
+  .b-back:hover{color:var(--ink); filter:none}
   .hint{text-align:center; color:var(--muted); font-size:13px; margin-top:14px}
   /* 결과 화면 */
   .done{background:var(--card); border-radius:20px; padding:30px 26px; box-shadow:0 18px 50px rgba(40,30,80,.28); margin-top:16px; text-align:center}
@@ -92,9 +95,10 @@
 </div>
 
 <script>
-let items = [], i = 0, status = {}, feedback = {}, choice = null;
+let items = [], i = 0, status = {}, feedback = {}, choices = {}, choice = null;
 const stage = document.getElementById('stage');
 
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function r(md){ try{ return marked.parse(md); }catch(e){ return md.replace(/\n/g,'<br>'); } }
 function ri(md){ try{ return marked.parseInline(md); }catch(e){ return md; } }
 function counts(){
@@ -125,7 +129,7 @@ function render(){
         <div class="lbl">정답</div>${r(it.body)}
         <div class="fb">
           <div class="fblbl">✏️ 피드백 (선택) — 예문/설명 개선 요청</div>
-          <textarea id="fb" placeholder="예: 예문이 너무 짧아, 더 구체적인 예시 붙여줘 / 설명이 모호해, 보강해줘"></textarea>
+          <textarea id="fb" placeholder="예: 예문이 너무 짧아, 더 구체적인 예시 붙여줘 / 설명이 모호해, 보강해줘">${esc(feedback[it.id]||'')}</textarea>
         </div>
       </div>
       <div class="btns" id="btns">
@@ -133,11 +137,13 @@ function render(){
         <button class="b-dont" onclick="pick('dont')">모른다</button>
       </div>
       <div class="hint">아는지 먼저 고른 뒤 정답을 확인해</div>
+      ${i>0 ? '<div class="nav"><button class="b-back" onclick="back()">← 이전 문제</button></div>' : ''}
     </div>`;
 }
 
 function pick(kind){
   choice=kind;
+  choices[items[i].id]=kind;
   document.getElementById('ans').classList.add('show');
   const btns=document.getElementById('btns');
   const hint=document.querySelector('.hint');
@@ -152,12 +158,30 @@ function pick(kind){
   }
 }
 
+// 지금 카드의 피드백 입력을 기억 (비우면 삭제)
+function saveFb(){
+  const el=document.getElementById('fb');
+  if(!el) return;
+  const v=el.value.trim(), id=items[i].id;
+  if(v) feedback[id]=v; else delete feedback[id];
+}
+
 function grade(st){
-  const fbEl=document.getElementById('fb');
-  if(fbEl){ const v=fbEl.value.trim(); if(v) feedback[items[i].id]=v; }
+  saveFb();
   status[items[i].id]=st;
   i++;
   render();
+}
+
+// 이전 문제로 — 채점 취소 후 정답 공개 화면(안다/모른다 고른 상태)으로 복귀, 피드백은 유지
+function back(){
+  if(i<=0) return;
+  saveFb();
+  i--;
+  const id=items[i].id;
+  delete status[id];
+  render();
+  if(choices[id]) pick(choices[id]);
 }
 
 async function finish(){
